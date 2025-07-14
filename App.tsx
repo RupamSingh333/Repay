@@ -1,118 +1,153 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { Component } from 'react';
+import { View, Image } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import Dashboard from './src/screens/DashBoardScreen/DashBoardScreen';
+import SplashScreen from './src/screens/SplashScreen';
+import LoginScreen from './src/screens/LoginScreen/LoginScreen';
+import OTPScreen from './src/screens/OtpScreen/OtpScreen';
+import HomeScreen from './src/screens/HomeScreen/HomeScreen';
+import Toast from './src/components/Toast';
+import RewardScreen from './src/screens/RewardsScreen/RewardScreen';
+import UplaodScreenShot from './src/screens/UploadScreenShot/UplaodScreenshot';
+import PaymentStatusScreen from './src/screens/PaymentStatusScreen/PaymentStatusScreen';
+import HomeScreen2 from './src/screens/HomeScreen2/HomeScreen2';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const Stack = createNativeStackNavigator();
+const Bottom = createBottomTabNavigator();
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
-
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+function BottomTab({ rootNavigation, setIsLoggedIn }) {
   return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
+    <Bottom.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconSource;
+
+          if (route.name === 'Dashboard') {
+            iconSource = require('./src/assets/icons/menu.png');
+          } else if (route.name === 'Reward') {
+            iconSource = require('./src/assets/icons/coin.png');
+          } else if (route.name === 'Uplaod ScreenShot') {
+            iconSource = require('./src/assets/icons/down-arrow.png');
+          } else if (route.name === 'Payment Status') {
+            iconSource = require('./src/assets/icons/coin.png');
+          }
+
+          return (
+            <Image
+              source={iconSource}
+              style={{ width: 24, height: 24, tintColor: color }}
+              resizeMode="contain"
+            />
+          );
+        },
+        tabBarActiveTintColor: '#7B5CFA',
+        tabBarInactiveTintColor: 'gray',
+      })}
+    >
+      <Bottom.Screen name="Dashboard">
+        {(props) => (
+          <Dashboard
+            {...props}
+            rootNavigation={rootNavigation}
+            setIsLoggedIn={setIsLoggedIn}
+          />
+        )}
+      </Bottom.Screen>
+      <Bottom.Screen name="Reward" component={RewardScreen} />
+      <Bottom.Screen name="Uplaod ScreenShot" component={UplaodScreenShot} />
+      <Bottom.Screen name="Payment Status" component={PaymentStatusScreen} />
+    </Bottom.Navigator>
   );
 }
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+export default class Routes extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isLoggedIn: null,
+      isFirstLaunch: null,
+      splashDone: false,
+    };
+    this.toastRef = React.createRef();
+    this.navigatorRef = React.createRef();
+  }
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  async componentDidMount() {
+    const token = await AsyncStorage.getItem('liveCustomerToken');
+    const isFirstLaunch = await AsyncStorage.getItem('isFirstLaunch');
+
+    if (isFirstLaunch === null) {
+      await AsyncStorage.setItem('isFirstLaunch', 'false');
+      this.setState({ isFirstLaunch: true, isLoggedIn: !!token });
+      setTimeout(() => {
+        this.setState({ splashDone: true });
+      }, 2000);
+    } else {
+      this.setState({ isFirstLaunch: false, isLoggedIn: !!token, splashDone: true });
+    }
+  }
+
+  setIsLoggedIn = (status) => {
+    this.setState({ isLoggedIn: status });
   };
 
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+  render() {
+    const { isLoggedIn, isFirstLaunch, splashDone } = this.state;
+
+    if (isLoggedIn === null || isFirstLaunch === null) return null;
+
+    return (
+      <View style={{ flex: 1 }}>
+        <NavigationContainer ref={(ref) => (this.navigatorRef = ref)}>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {isFirstLaunch && !splashDone ? (
+              <Stack.Screen name="Splash" component={SplashScreen} />
+            ) : isLoggedIn ? (
+              <>
+                <Stack.Screen name="BottomTab">
+                  {(props) => (
+                    <BottomTab
+                      {...props}
+                      rootNavigation={this.navigatorRef}
+                      setIsLoggedIn={this.setIsLoggedIn}
+                    />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen name="Home2" component={HomeScreen2} />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="Home">
+                  {(props) => (
+                    <HomeScreen {...props} toastRef={this.toastRef} />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen name="Login">
+                  {(props) => (
+                    <LoginScreen {...props} toastRef={this.toastRef} />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen name="OTP">
+                  {(props) => (
+                    <OTPScreen
+                      {...props}
+                      toastRef={this.toastRef}
+                      onLoginSuccess={() => this.setIsLoggedIn(true)}
+                    />
+                  )}
+                </Stack.Screen>
+              </>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+
+        <Toast ref={(ref) => (this.toastRef = ref)} />
+      </View>
+    );
+  }
 }
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
-
-export default App;
