@@ -5750,6 +5750,11 @@ react-native-chart-kit@^6.12.0:
     paths-js "^0.4.10"
     point-in-polygon "^1.0.1"
 
+react-native-confetti-cannon@^1.5.2:
+  version "1.5.2"
+  resolved "https://registry.yarnpkg.com/react-native-confetti-cannon/-/react-native-confetti-cannon-1.5.2.tgz#ca1a05edd2a64b080ea8b6238c49277908e1f123"
+  integrity sha512-IZuWjlW7QsdxEGNnvpD6W+7iKCCQhnd5BvuNvMtirU7Nxm8WS2N6LPGMBz1ZYDuusG+GRZkoXXTNCdoAAGpCTg==
+
 react-native-get-random-values@^1.11.0:
   version "1.11.0"
   resolved "https://registry.yarnpkg.com/react-native-get-random-values/-/react-native-get-random-values-1.11.0.tgz#1ca70d1271f4b08af92958803b89dccbda78728d"
@@ -5776,6 +5781,11 @@ react-native-safe-area-context@^5.5.1:
   version "5.5.1"
   resolved "https://registry.yarnpkg.com/react-native-safe-area-context/-/react-native-safe-area-context-5.5.1.tgz#9fac8ae5da8b9ff6f77eb3f697e073f04a1f2f3f"
   integrity sha512-WYxV+mm7SWuapVWxq2071lkQlDUXjSwcu7Cc2bUtNcF80/Bl0WnuWAZ8+tO46M38PclMrQIIgbv83BvDHJNQ5g==
+
+react-native-scratch@^1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/react-native-scratch/-/react-native-scratch-1.2.1.tgz#cedc180261946de4ce21dc1ab394413e5868ed21"
+  integrity sha512-oBOIMZ5YC/ytxaxmOYsTXDy0hckoq4arGKWN0F2Q22OlHhaBYTsNLez/HDbQIWLFQOhyWU9d1HNlq7wZM7vlYg==
 
 react-native-screens@^4.11.1:
   version "4.11.1"
@@ -6033,11 +6043,6 @@ rimraf@^3.0.2:
   integrity sha512-JZkJMZkAGFFPP2YqXZXPbMlMBgsxzE8ILs4lMIX/2o0L9UBw9O/Y3o6wFw/i9YLapcUJWwqbi3kdxIPdC62TIA==
   dependencies:
     glob "^7.1.3"
-
-rn-scratch-card@^1.2.3:
-  version "1.2.3"
-  resolved "https://registry.yarnpkg.com/rn-scratch-card/-/rn-scratch-card-1.2.3.tgz#bfe1cd37a4010d9954fe1dc2aebeba75860fb8f1"
-  integrity sha512-mTKWCC3nUEdEqDGUOGMCh5kajE7aOE2V1l+BzGXXxlk6kAdG0l1MAYjvn93bTz2fzNaTZ0X85oRlEw5NISairw==
 
 run-parallel@^1.1.9:
   version "1.2.0"

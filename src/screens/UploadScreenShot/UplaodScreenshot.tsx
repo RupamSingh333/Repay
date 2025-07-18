@@ -16,7 +16,8 @@ export default class UploadPaymentScreenshot extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      screenshots: [], // will hold uri
+      selectedImage: null,
+      screenshots: [],
     };
   }
 
@@ -34,14 +35,14 @@ export default class UploadPaymentScreenshot extends Component {
         const uri = response.assets[0].uri;
         console.log("Selected Image URI:", uri);
         this.setState({
-          screenshots: [uri],
+          selectedImage: uri,
         });
       }
     });
   };
 
   uploadScreenshot = async () => {
-    if (this.state.screenshots.length === 0) {
+    if (!this.state.selectedImage) {
       Alert.alert("Please select an image first.");
       return;
     }
@@ -54,8 +55,8 @@ export default class UploadPaymentScreenshot extends Component {
 
     const formData = new FormData();
     formData.append("screenshot", {
-      uri: this.state.screenshots[0],
-      type: "image/jpeg", // or the correct mime type
+      uri: this.state.selectedImage,
+      type: "image/jpeg",
       name: "screenshot.jpg",
     });
 
@@ -77,7 +78,8 @@ export default class UploadPaymentScreenshot extends Component {
 
       if (result.success) {
         Alert.alert("Success", "Screenshot uploaded successfully!");
-        this.setState({ screenshots: [] });
+        this.setState({ selectedImage: null });
+        this.fetchUploadedScreenshots();
       } else {
         Alert.alert("Failed", "Upload failed. Please try again.");
       }
@@ -87,11 +89,81 @@ export default class UploadPaymentScreenshot extends Component {
     }
   };
 
+  fetchUploadedScreenshots = async () => {
+    const token = await AsyncStorage.getItem("liveCustomerToken");
+    if (!token) {
+      Alert.alert("Auth token not found");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "https://api.repaykaro.com/api/v1/clients/get-screenshot",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      console.log("Fetched Screenshots:", result);
+
+      if (result?.screen_shot?.length > 0) {
+        this.setState({ screenshots: result.screen_shot });
+      } else {
+        this.setState({ screenshots: [] });
+      }
+    } catch (error) {
+      console.error("Fetch Screenshot Error:", error);
+      Alert.alert("Error fetching uploaded screenshots.");
+    }
+  };
+
+deleteScreenshot = async (_id) => {
+  const token = await AsyncStorage.getItem("liveCustomerToken");
+  if (!token) {
+    Alert.alert("Auth token not found");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.repaykaro.com/api/v1/clients/delete-screenshot/${_id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const result = await response.json();
+    console.log("Delete Response:", result);
+
+    if (result.success) {
+      Alert.alert("Deleted", "Screenshot deleted successfully!");
+      this.fetchUploadedScreenshots();
+    } else {
+      Alert.alert("Failed", "Failed to delete. Please try again.");
+    }
+  } catch (error) {
+    console.error("Delete Screenshot Error:", error);
+    Alert.alert("Error", "Something went wrong while deleting.");
+  }
+};
+
+
+  componentDidMount() {
+    this.fetchUploadedScreenshots();
+  }
+
   render() {
-    const { screenshots } = this.state;
+    const { selectedImage, screenshots } = this.state;
 
     return (
-      <View>
+      <View style={{ flex: 1 }}>
         <HeaderComponent
           title="Upload Screenshot"
           showBack={true}
@@ -103,15 +175,26 @@ export default class UploadPaymentScreenshot extends Component {
               style={styles.dropBox}
               onPress={this.pickImage}
             >
-              <Text style={styles.selectText}>Select a file</Text>
-              <Text style={styles.orText}>or pick from gallery</Text>
-              <Text style={styles.limitText}>PNG, JPG, GIF up to 10MB</Text>
+              {selectedImage ? (
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={styles.previewImage}
+                />
+              ) : (
+                <>
+                  <Text style={styles.selectText}>Select a file</Text>
+                  <Text style={styles.orText}>or pick from gallery</Text>
+                  <Text style={styles.limitText}>
+                    PNG, JPG, GIF up to 10MB
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => this.setState({ screenshots: [] })}
+                onPress={() => this.setState({ selectedImage: null })}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -126,16 +209,28 @@ export default class UploadPaymentScreenshot extends Component {
           </View>
 
           <View style={styles.uploadedContainer}>
-            <Text style={styles.uploadedTitle}>Uploaded Screenshot</Text>
+            <Text style={styles.uploadedTitle}>Uploaded Screenshots</Text>
             {screenshots.length === 0 ? (
               <Text style={styles.noScreenshots}>
-                No screenshot uploaded yet
+                No screenshots uploaded yet
               </Text>
             ) : (
-              <Image
-                source={{ uri: screenshots[0] }}
-                style={styles.uploadedImage}
-              />
+              <View style={styles.gridContainer}>
+                {screenshots.map((item) => (
+                  <View key={item._id} style={styles.imageWrapper}>
+                    <Image
+                      source={{ uri: item.screen_shot }}
+                      style={styles.uploadedImage}
+                    />
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => this.deleteScreenshot(item._id)}
+                    >
+                      <Text style={styles.deleteText}>X</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
             )}
           </View>
         </ScrollView>
@@ -168,6 +263,7 @@ const styles = StyleSheet.create({
     height: 150,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
   },
   selectText: {
     color: "#7B5CFA",
@@ -182,6 +278,11 @@ const styles = StyleSheet.create({
     marginTop: 5,
     color: "#999",
     fontSize: 12,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
   buttonRow: {
     flexDirection: "row",
@@ -211,6 +312,7 @@ const styles = StyleSheet.create({
   },
   uploadedContainer: {
     marginTop: 30,
+    width: "100%",
     alignItems: "center",
   },
   uploadedTitle: {
@@ -221,9 +323,35 @@ const styles = StyleSheet.create({
   noScreenshots: {
     color: "#999",
   },
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
+  },
+  imageWrapper: {
+    position: "relative",
+    margin: 5,
+  },
   uploadedImage: {
     width: 100,
     height: 100,
     borderRadius: 8,
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
   },
 });

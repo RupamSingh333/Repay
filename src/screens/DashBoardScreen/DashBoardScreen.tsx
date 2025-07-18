@@ -116,9 +116,7 @@ export default class Dashboard extends Component {
           showLogo={true}
           showLogout={true}
           onBackPress={() => this.props.navigation.goBack()}
-            setIsLoggedIn={this.props.setIsLoggedIn}
-
-        />
+          setIsLoggedIn={this.props.setIsLoggedIn} />
 
         <ScrollView style={styles.container}>
           <Text style={styles.welcome}>

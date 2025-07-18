@@ -4,86 +4,29 @@ import {
   Text,
   StyleSheet,
   Dimensions,
-  PanResponder,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import ScratchView from "react-native-scratch";
+import ConfettiCannon from "react-native-confetti-cannon";
 import HeaderComponent from "../../components/HeaderComponent";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
+const CARD_WIDTH = width / 2 - 30;
 
-// ✅ Scratch Card Component
-class ScratchCardPure extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      scratches: [],
-      cleared: false,
-    };
-
-    this.panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        this.setState((prev) => ({
-          scratches: [...prev.scratches, { x: locationX, y: locationY }],
-        }));
-      },
-      onPanResponderRelease: () => {
-        if (!this.state.cleared && this.state.scratches.length > 50) {
-          this.setState({ cleared: true });
-          this.props.onScratchDone();
-        }
-      },
-    });
-  }
-
-  render() {
-    return (
-      <View style={{ width: "100%", height: "100%" }}>
-
-
-        {/* Scratch layer */}
-        {!this.state.cleared && (
-          <View
-            style={styles.scratchLayer}
-            {...this.panResponder.panHandlers}
-          >
-            {this.state.scratches.map((s, i) => (
-              <View
-                key={i}
-                style={{
-                  position: "absolute",
-                  left: s.x - 20,
-                  top: s.y - 20,
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: "#999",
-                  opacity: 0,
-                  shadowColor: "#999",
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 1,
-                  shadowRadius: 20,
-                }}
-              />
-            ))}
-          </View>
-        )}
-      </View>
-    );
-  }
-}
-
-// ✅ Main Screen
-export default class RewardScreen extends Component {
+export default class ScratchCardList extends Component {
   constructor(props) {
     super(props);
     this.state = {
       coupons: [],
       loading: true,
+      scrollEnabled: true,
+      refreshing: false,
+      confettiVisible: false, // 🔑 Global confetti flag
     };
   }
 
@@ -91,159 +34,268 @@ export default class RewardScreen extends Component {
     this.getCoupons();
   }
 
-  // ✅ GET Coupons
-  getCoupons = async () => {
+  async getCoupons() {
+    this.setState({ loading: true });
     try {
       const token = await AsyncStorage.getItem("liveCustomerToken");
+      if (!token) {
+        Alert.alert("Token Error", "No token found");
+        this.setState({ loading: false, refreshing: false });
+        return;
+      }
+
       const response = await fetch(
         "https://api.repaykaro.com/api/v1/clients/get-coupon",
         {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
           },
         }
       );
-      const json = await response.json();
-      console.log("Coupons:", json);
-      this.setState({ coupons: json.coupon, loading: false });
-    } catch (error) {
-      console.error("GetCoupons Error:", error);
-    }
-  };
-
-  // ✅ POST Scratch
-  markScratched = async (couponId, index) => {
-    console.log("Scratching Coupon ID:", couponId);
-
-    try {
-      const token = await AsyncStorage.getItem("liveCustomerToken");
-
-      const response = await fetch(
-        "https://api.repaykaro.com/api/v1/clients/coupon-scratch",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            _id: couponId,
-          }),
-        }
-      );
-
-      console.log("Scratch API status:", response.status);
 
       const json = await response.json();
-      console.log("Scratch API Response:", json);
-
-      if (response.ok && json.success) {
-        const updated = [...this.state.coupons];
-        updated[index].scratched = 1;
-        this.setState({ coupons: updated });
+      if (json.success) {
+        this.setState({
+          coupons: json.coupon,
+          loading: false,
+          refreshing: false,
+        });
       } else {
-        console.error("Scratch API Failed:", json);
+        Alert.alert("Error", "Failed to get coupons");
+        this.setState({ loading: false, refreshing: false });
       }
     } catch (error) {
-      console.error("Scratch API Error:", error);
+      console.log(error);
+      Alert.alert("Error", error.message);
+      this.setState({ loading: false, refreshing: false });
     }
+  }
+
+  handleReveal = (id) => {
+    console.log("Scratch revealed for ID:", id);
+    this.setState(
+      (prev) => ({
+        coupons: prev.coupons.map((c) =>
+          c._id === id ? { ...c, scratched: 1 } : c
+        ),
+        confettiVisible: true,
+      }),
+      () => {
+        // Confetti visible 2 sec, then hide + refresh
+        setTimeout(() => {
+          this.setState({ confettiVisible: false });
+          this.getCoupons();
+        }, 2000);
+      }
+    );
   };
 
-  renderCoupon = ({ item, index }) => (
+  onRefresh = () => {
+    this.setState({ refreshing: true }, () => {
+      this.getCoupons();
+    });
+  };
+
+  setScrollEnabled = (enabled) => {
+    this.setState({ scrollEnabled: enabled });
+  };
+
+  renderItem = ({ item }) => (
     <View style={styles.card}>
-      {item.scratched ? (
-        <View style={styles.revealed}>
-          <Text style={styles.amount}>₹{item.amount.$numberDecimal}</Text>
-          <Text style={styles.status}>Ready to Redeem</Text>
-          <TouchableOpacity style={styles.button}>
-            <Text style={styles.buttonText}>Redeem Now</Text>
-          </TouchableOpacity>
-          <Text style={styles.code}>Code: {item.coupon_code}</Text>
-          <Text style={styles.validity}>Valid for {item.validity} days</Text>
-        </View>
+      {item.scratched === 1 ? (
+        <RevealedCard item={item} />
       ) : (
-        <ScratchCardPure
-          amount={item.amount.$numberDecimal}
-          validity={item.validity}
-          scratched={item.scratched}
-          onScratchDone={() => this.markScratched(item._id, index)}
+        <ScratchCardItem
+          item={item}
+          onRevealed={() => this.handleReveal(item._id)}
+          setScrollEnabled={this.setScrollEnabled}
         />
       )}
     </View>
   );
 
   render() {
+    const { coupons, loading, scrollEnabled, refreshing, confettiVisible } =
+      this.state;
+
     return (
-      <View style={styles.container}>
+      <>
         <HeaderComponent
           title="Rewards"
-          showBack={true}
+          showBack
           onBackPress={() => this.props.navigation.goBack()}
         />
-        {this.state.loading ? (
-          <ActivityIndicator size="large" color="#0000ff" />
-        ) : (
-          <FlatList
-            data={this.state.coupons}
-            keyExtractor={(item) => item._id}
-            renderItem={this.renderCoupon}
-            contentContainerStyle={styles.list}
-          />
-        )}
+        <View style={styles.container}>
+          {loading ? (
+            <ActivityIndicator size="large" />
+          ) : (
+            <FlatList
+              data={coupons}
+              keyExtractor={(item) => item._id}
+              renderItem={this.renderItem}
+              numColumns={2}
+              columnWrapperStyle={{ justifyContent: "space-between" }}
+              contentContainerStyle={{ paddingHorizontal: 20 }}
+              scrollEnabled={scrollEnabled}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={this.onRefresh}
+                />
+              }
+            />
+          )}
+
+          {confettiVisible && (
+            <ConfettiCannon
+              count={120}
+              origin={{ x: width / 2, y: 0 }}
+              fadeOut
+              autoStart
+            />
+          )}
+        </View>
+      </>
+    );
+  }
+}
+
+const RevealedCard = ({ item }) => (
+  <View style={styles.revealContent}>
+    <Text style={styles.amount}>₹{item.amount?.$numberDecimal || "0.00"}</Text>
+    <View style={styles.badge}>
+      <Text style={styles.badgeText}>Ready to Redeem</Text>
+    </View>
+    <TouchableOpacity style={styles.redeemBtn}>
+      <Text style={styles.redeemText}>Redeem Now</Text>
+    </TouchableOpacity>
+    <Text style={styles.code}>Code: {item.coupon_code}</Text>
+    <Text style={styles.infoText}>Valid for {item.validity || 10} days</Text>
+    <Text style={styles.infoText}>
+      Created: {new Date(item.createdAt).toLocaleDateString()}
+    </Text>
+  </View>
+);
+
+class ScratchCardItem extends Component {
+  handleReveal = () => {
+    console.log("Scratch done!");
+    this.props.onRevealed();
+  };
+
+  render() {
+    const { item, setScrollEnabled } = this.props;
+
+    return (
+      <View style={{ flex: 1, height: 200 }}>
+        <ScratchView
+          style={{ flex: 1 }}
+          brushSize={50}
+          threshold={30}
+          fadeOut
+          placeholderColor="#2C3345"
+          onRevealScratch={this.handleReveal}
+          renderPlaceholder={() => (
+            <View style={styles.placeholder}>
+              <View style={styles.circle}>
+                <Text style={styles.cross}>×</Text>
+              </View>
+              <Text style={styles.placeholderText}>Scratch here to reveal</Text>
+            </View>
+          )}
+          renderContent={() => <RevealedCard item={item} />}
+          onTouchStart={() => setScrollEnabled(false)}
+          onTouchEnd={() => setScrollEnabled(true)}
+        />
       </View>
     );
   }
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f2f2f2" },
-  list: { paddingBottom: 40 },
+  container: {
+    flex: 1,
+    backgroundColor: "#f3f4f6",
+    paddingTop: 50,
+  },
   card: {
-    width: width * 0.9,
-    height: height * 0.3,
+    width: CARD_WIDTH,
+    height: 250,
     backgroundColor: "#fff",
     borderRadius: 10,
-    marginBottom: 20,
     overflow: "hidden",
-    alignSelf: "center",
+    marginBottom: 20,
+    elevation: 4,
   },
-  rewardContent: {
+  placeholder: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#2C3345",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 1,
   },
-  scratchLayer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#999",
-    zIndex: 2,
+  circle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
   },
-  revealed: { alignItems: "center", padding: 20 },
-  amount: { fontSize: 30, fontWeight: "bold", color: "#333" },
-  status: {
-    backgroundColor: "#f0c420",
-    color: "#333",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  cross: {
+    fontSize: 30,
+    color: "#ccc",
+    fontWeight: "bold",
+  },
+  placeholderText: {
+    color: "#ddd",
+    fontSize: 14,
+  },
+  revealContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 10,
+  },
+  amount: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#3366FF",
+  },
+  badge: {
+    marginTop: 8,
+    backgroundColor: "#FDE68A",
     borderRadius: 20,
-    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  button: {
-    backgroundColor: "#3366FF",
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    marginTop: 15,
+  badgeText: {
+    fontSize: 12,
+    color: "#7C3AED",
+    fontWeight: "bold",
   },
-  buttonText: { color: "#fff", fontWeight: "bold" },
-  code: { marginTop: 10, fontSize: 14, color: "#666" },
-  validity: { fontSize: 12, color: "#999", marginTop: 4 },
+  redeemBtn: {
+    marginTop: 8,
+    backgroundColor: "#3B82F6",
+    paddingHorizontal: 15,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  redeemText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  code: {
+    fontSize: 12,
+    marginTop: 8,
+    color: "#333",
+  },
+  infoText: {
+    fontSize: 10,
+    color: "#666",
+    marginTop: 2,
+  },
 });

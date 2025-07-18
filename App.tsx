@@ -1,9 +1,10 @@
 import React, { Component } from 'react';
-import { View, Image } from 'react-native';
+import { View, StatusBar, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'; // ✅ Added
 
 import Dashboard from './src/screens/DashBoardScreen/DashBoardScreen';
 import SplashScreen from './src/screens/SplashScreen';
@@ -102,52 +103,56 @@ export default class Routes extends Component {
     if (isLoggedIn === null || isFirstLaunch === null) return null;
 
     return (
-      <View style={{ flex: 1 }}>
-        <NavigationContainer ref={(ref) => (this.navigatorRef = ref)}>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {isFirstLaunch && !splashDone ? (
-              <Stack.Screen name="Splash" component={SplashScreen} />
-            ) : isLoggedIn ? (
-              <>
-                <Stack.Screen name="BottomTab">
-                  {(props) => (
-                    <BottomTab
-                      {...props}
-                      rootNavigation={this.navigatorRef}
-                      setIsLoggedIn={this.setIsLoggedIn}
-                    />
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="Home2" component={HomeScreen2} />
-              </>
-            ) : (
-              <>
-                <Stack.Screen name="Home">
-                  {(props) => (
-                    <HomeScreen {...props} toastRef={this.toastRef} />
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="Login">
-                  {(props) => (
-                    <LoginScreen {...props} toastRef={this.toastRef} />
-                  )}
-                </Stack.Screen>
-                <Stack.Screen name="OTP">
-                  {(props) => (
-                    <OTPScreen
-                      {...props}
-                      toastRef={this.toastRef}
-                      onLoginSuccess={() => this.setIsLoggedIn(true)}
-                    />
-                  )}
-                </Stack.Screen>
-              </>
-            )}
-          </Stack.Navigator>
-        </NavigationContainer>
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
-        <Toast ref={(ref) => (this.toastRef = ref)} />
-      </View>
+          <NavigationContainer ref={(ref) => (this.navigatorRef = ref)}>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {isFirstLaunch && !splashDone ? (
+                <Stack.Screen name="Splash" component={SplashScreen} />
+              ) : isLoggedIn ? (
+                <>
+                  <Stack.Screen name="BottomTab">
+                    {(props) => (
+                      <BottomTab
+                        {...props}
+                        rootNavigation={this.navigatorRef}
+                        setIsLoggedIn={this.setIsLoggedIn}
+                      />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Home2" component={HomeScreen2} />
+                </>
+              ) : (
+                <>
+                  <Stack.Screen name="Home">
+                    {(props) => (
+                      <HomeScreen {...props} toastRef={this.toastRef} />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="Login">
+                    {(props) => (
+                      <LoginScreen {...props} toastRef={this.toastRef} />
+                    )}
+                  </Stack.Screen>
+                  <Stack.Screen name="OTP">
+                    {(props) => (
+                      <OTPScreen
+                        {...props}
+                        toastRef={this.toastRef}
+                        onLoginSuccess={() => this.setIsLoggedIn(true)}
+                      />
+                    )}
+                  </Stack.Screen>
+                </>
+              )}
+            </Stack.Navigator>
+          </NavigationContainer>
+
+          <Toast ref={(ref) => (this.toastRef = ref)} />
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 }
