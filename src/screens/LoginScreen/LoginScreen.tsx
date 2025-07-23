@@ -7,6 +7,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { apiPost } from '../../api/Api';
 
@@ -15,40 +16,45 @@ export default class LoginScreen extends Component {
     super(props);
     this.state = {
       mobileNumber: '',
+      loading: false,
     };
   }
 
-handleSendOTP = async () => {
-  const { mobileNumber } = this.state;
+  handleSendOTP = async () => {
+    const { mobileNumber } = this.state;
 
-  if (mobileNumber.length !== 10) {
-    this.props.toastRef.show('Please enter a valid 10-digit mobile number', 2000);
-    return;
-  }
-
-  try {
-    const json = await apiPost('clientAuth/login', { phone: mobileNumber });
-    console.log('API Response:', json);
-
-    if (json.success) {
-      this.props.toastRef.show('OTP sent successfully!', 2000);
-      this.props.navigation.navigate('OTP', { mobile: mobileNumber });
-    } else {
-      this.props.toastRef.show(json.message || 'Something went wrong!', 2000);
+    if (mobileNumber.length !== 10) {
+      this.props.toastRef.current.show('Please enter a valid 10-digit mobile number', 2000);
+      return;
     }
-  } catch (error) {
-    console.error(error);
-    this.props.toastRef.show('Network error!', 2000);
-  }
-};
 
+    this.setState({ loading: true });
 
+    try {
+      const json = await apiPost('clientAuth/login', { phone: mobileNumber });
+      console.log('API Response:', json);
+
+      if (json.success) {
+        this.props.toastRef.current.show('OTP sent successfully!', 2000);
+        this.props.navigation.navigate('OTP', { mobile: mobileNumber });
+      } else {
+        this.props.toastRef.current.show(json.message || 'Something went wrong!', 2000);
+      }
+    } catch (error) {
+      console.error(error);
+      this.props.toastRef.current.show('Network error!', 2000);
+    } finally {
+      this.setState({ loading: false });
+    }
+  };
 
   handleNavigate = () => {
     this.props.navigation.navigate('Home');
   };
 
   render() {
+    const { loading } = this.state;
+
     return (
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: '#F9F9F9' }}
@@ -83,11 +89,19 @@ handleSendOTP = async () => {
                 style={styles.button}
                 onPress={this.handleSendOTP}
                 activeOpacity={0.8}
+                disabled={loading}
               >
                 <Text style={styles.buttonText}>Send OTP</Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* ✅ Full-Screen Loader */}
+          {loading && (
+            <View style={styles.loaderOverlay}>
+              <ActivityIndicator size="large" color="#7B5CFA" />
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     );
@@ -152,5 +166,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

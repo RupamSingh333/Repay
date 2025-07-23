@@ -11,7 +11,7 @@ export default class Toast extends React.Component {
     };
   }
 
-  show = (message = '', duration = 10000) => {
+  show = (message = '', duration = 2000) => {
     this.setState({ visible: true, message }, () => {
       Animated.timing(this.state.fadeAnim, {
         toValue: 1,
@@ -55,6 +55,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 20,
     alignItems: 'center',
+    zIndex: 9999,
   },
   toastText: {
     color: '#fff',

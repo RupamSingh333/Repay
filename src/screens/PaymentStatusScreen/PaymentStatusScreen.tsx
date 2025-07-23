@@ -21,9 +21,29 @@ export default class PaymentStatusScreen extends Component {
   }
 
   componentDidMount() {
-    this.fetchTimeline();
-    this.startAnimation();
+    this.loadData();
   }
+
+  loadData = async () => {
+    this.setState({ loading: true, timeline: [] });
+    try {
+      const result = await apiGet("clients/get-timeline");
+      console.log("Timeline Data:", result);
+
+      if (result && result.success && result.timeline?.length > 0) {
+        this.setState(
+          { timeline: result.timeline, loading: false },
+          this.startAnimation
+        );
+      } else {
+        console.warn("No timeline data found");
+        this.setState({ loading: false });
+      }
+    } catch (error) {
+      console.error("Error fetching timeline:", error);
+      this.setState({ loading: false });
+    }
+  };
 
   startAnimation = () => {
     Animated.timing(this.state.fadeAnim, {
@@ -31,23 +51,6 @@ export default class PaymentStatusScreen extends Component {
       duration: 1000,
       useNativeDriver: true,
     }).start();
-  };
-
-  fetchTimeline = async () => {
-    try {
-      const result = await apiGet("clients/get-timeline");
-      console.log("Timeline Data:", result);
-
-      if (result && result.success && result.timeline) {
-        this.setState({ timeline: result.timeline, loading: false });
-      } else {
-        console.warn("Timeline not found in API response");
-        this.setState({ loading: false });
-      }
-    } catch (error) {
-      console.error("Error fetching timeline:", error);
-      this.setState({ loading: false });
-    }
   };
 
   formatDate = (isoString) => {
@@ -85,13 +88,18 @@ export default class PaymentStatusScreen extends Component {
         />
 
         {loading ? (
-          <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color="#7B5CFA" />
+          </View>
         ) : (
           <FlatList
             data={timeline}
             renderItem={this.renderItem}
             keyExtractor={(item, index) => index.toString()}
             contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No timeline data found.</Text>
+            }
           />
         )}
       </View>
@@ -104,8 +112,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F7FAFC",
   },
-  loader: {
-    marginTop: 50,
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   listContainer: {
     padding: 16,
@@ -153,5 +163,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#374151",
     marginTop: 2,
+  },
+  emptyText: {
+    textAlign: "center",
+    marginTop: 50,
+    color: "#999",
   },
 });

@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'; // ✅ Added
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import Dashboard from './src/screens/DashBoardScreen/DashBoardScreen';
 import SplashScreen from './src/screens/SplashScreen';
@@ -13,14 +13,14 @@ import OTPScreen from './src/screens/OtpScreen/OtpScreen';
 import HomeScreen from './src/screens/HomeScreen/HomeScreen';
 import Toast from './src/components/Toast';
 import RewardScreen from './src/screens/RewardsScreen/RewardScreen';
-import UplaodScreenShot from './src/screens/UploadScreenShot/UplaodScreenshot';
 import PaymentStatusScreen from './src/screens/PaymentStatusScreen/PaymentStatusScreen';
 import HomeScreen2 from './src/screens/HomeScreen2/HomeScreen2';
+import UploadPaymentScreenshot from './src/screens/UploadScreenShot/UplaodScreenshot';
 
 const Stack = createNativeStackNavigator();
 const Bottom = createBottomTabNavigator();
 
-function BottomTab({ rootNavigation, setIsLoggedIn }) {
+function BottomTab({ rootNavigation, setIsLoggedIn, toastRef }) {
   return (
     <Bottom.Navigator
       screenOptions={({ route }) => ({
@@ -32,7 +32,7 @@ function BottomTab({ rootNavigation, setIsLoggedIn }) {
             iconSource = require('./src/assets/icons/menu.png');
           } else if (route.name === 'Reward') {
             iconSource = require('./src/assets/icons/coin.png');
-          } else if (route.name === 'Uplaod ScreenShot') {
+          } else if (route.name === 'Upload Screenshot') {
             iconSource = require('./src/assets/icons/down-arrow.png');
           } else if (route.name === 'Payment Status') {
             iconSource = require('./src/assets/icons/coin.png');
@@ -59,8 +59,15 @@ function BottomTab({ rootNavigation, setIsLoggedIn }) {
           />
         )}
       </Bottom.Screen>
+
       <Bottom.Screen name="Reward" component={RewardScreen} />
-      <Bottom.Screen name="Uplaod ScreenShot" component={UplaodScreenShot} />
+
+      <Bottom.Screen name="Upload Screenshot">
+        {(props) => (
+          <UploadPaymentScreenshot {...props} toastRef={toastRef} />
+        )}
+      </Bottom.Screen>
+
       <Bottom.Screen name="Payment Status" component={PaymentStatusScreen} />
     </Bottom.Navigator>
   );
@@ -119,6 +126,7 @@ export default class Routes extends Component {
                         {...props}
                         rootNavigation={this.navigatorRef}
                         setIsLoggedIn={this.setIsLoggedIn}
+                        toastRef={this.toastRef}
                       />
                     )}
                   </Stack.Screen>
@@ -150,7 +158,8 @@ export default class Routes extends Component {
             </Stack.Navigator>
           </NavigationContainer>
 
-          <Toast ref={(ref) => (this.toastRef = ref)} />
+          {/* ✅ Toast should be here outside NavigationContainer */}
+          <Toast ref={this.toastRef} />
         </SafeAreaView>
       </SafeAreaProvider>
     );

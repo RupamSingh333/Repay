@@ -6,6 +6,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import OTPInputView from '@twotalltotems/react-native-otp-input';
 import { apiPost } from '../../api/Api';
@@ -17,6 +18,7 @@ export default class OTPScreen extends Component {
     this.state = {
       otp: '',
       resendTimer: 48,
+      loading: false,
     };
     this.timer = null;
   }
@@ -40,48 +42,47 @@ export default class OTPScreen extends Component {
           return { resendTimer: prev.resendTimer - 1 };
         } else {
           clearInterval(this.timer);
-          this.setState({ otp: '' }, () => {
-            this.startResendTimer();
-          });
           return { resendTimer: 0 };
         }
       });
     }, 1000);
   };
 
-handleVerifyOTP = async () => {
-  const { otp } = this.state;
-  const mobile = this.props.route?.params?.mobile || '';
+  handleVerifyOTP = async () => {
+    const { otp } = this.state;
+    const mobile = this.props.route?.params?.mobile || '';
 
-  if (otp.length !== 4) {
-    this.props.toastRef.show('Please enter a valid 4-digit OTP', 2000);
-    return;
-  }
-
-  try {
-    const json = await apiPost('clientAuth/validate-otp', {
-      phone: mobile,
-      otp: otp,
-    });
-
-    console.log('OTP Verify Response:', json);
-
-    if (json.success && json.jwtToken) {
-      await AsyncStorage.setItem('liveCustomerToken', json.jwtToken);
-
-      this.props.toastRef.show('OTP Verified! Redirecting...', 1500);
-
-      // ✅ ✅ ✅ Call parent callback instead of navigation.replace!
-      this.props.onLoginSuccess();
-
-    } else {
-      this.props.toastRef.show(json.message || 'Invalid OTP!', 2000);
+    if (otp.length !== 4) {
+      this.props.toastRef.current.show('Please enter a valid 4-digit OTP', 2000);
+      return;
     }
-  } catch (error) {
-    console.error(error);
-    this.props.toastRef.show('Network error!', 2000);
-  }
-};
+
+    this.setState({ loading: true });
+
+    try {
+      const json = await apiPost('clientAuth/validate-otp', {
+        phone: mobile,
+        otp: otp,
+      });
+
+      console.log('OTP Verify Response:', json);
+
+      if (json.success && json.jwtToken) {
+        await AsyncStorage.setItem('liveCustomerToken', json.jwtToken);
+
+        this.props.toastRef.current.show('OTP Verified! Redirecting...', 1500);
+
+        this.props.onLoginSuccess();
+      } else {
+        this.props.toastRef.current.show(json.message || 'Invalid OTP!', 2000);
+      }
+    } catch (error) {
+      console.error(error);
+      this.props.toastRef.current.show('Network error!', 2000);
+    } finally {
+      this.setState({ loading: false });
+    }
+  };
 
   handleBack = () => {
     this.props.navigation.goBack();
@@ -92,7 +93,7 @@ handleVerifyOTP = async () => {
   };
 
   render() {
-    const { resendTimer, otp } = this.state;
+    const { resendTimer, otp, loading } = this.state;
     const mobile = this.props.route?.params?.mobile || 'XXXXXXXXXX';
 
     return (
@@ -132,9 +133,15 @@ handleVerifyOTP = async () => {
               }}
             />
 
-            <Text style={styles.resendText}>
-              Resend OTP ({resendTimer}s)
-            </Text>
+            {resendTimer > 0 ? (
+              <Text style={styles.resendText}>
+                Resend OTP ({resendTimer}s)
+              </Text>
+            ) : (
+              <TouchableOpacity onPress={this.startResendTimer}>
+                <Text style={styles.resendButton}>Resend OTP</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity onPress={this.handleChangeNumber}>
               <Text style={styles.changeNumberText}>Change Mobile Number</Text>
@@ -143,10 +150,17 @@ handleVerifyOTP = async () => {
             <TouchableOpacity
               style={styles.button}
               onPress={this.handleVerifyOTP}
+              disabled={loading}
             >
               <Text style={styles.buttonText}>Verify OTP</Text>
             </TouchableOpacity>
           </View>
+
+          {loading && (
+            <View style={styles.loaderOverlay}>
+              <ActivityIndicator size="large" color="#7B5CFA" />
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     );
@@ -212,6 +226,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  resendButton: {
+    marginTop: 20,
+    color: '#7B5CFA',
+    fontWeight: 'bold',
+    fontSize: 14,
+    textAlign: 'center',
+  },
   changeNumberText: {
     marginTop: 10,
     color: '#7B5CFA',
@@ -229,5 +250,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

@@ -128,7 +128,7 @@ export default class ScratchCardList extends Component {
         />
         <View style={styles.container}>
           {loading ? (
-            <ActivityIndicator size="large" />
+            <ActivityIndicator size="large" color='#7B5CFA'/>
           ) : (
             <FlatList
               data={coupons}

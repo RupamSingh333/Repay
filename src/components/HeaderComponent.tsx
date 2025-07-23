@@ -5,30 +5,35 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  Alert,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { heightPercentageToDP, widthPercentageToDP } from "react-native-responsive-screen";
 import { CommonActions } from '@react-navigation/native';
 
 export default class HeaderComponent extends Component {
-  confirmLogout = () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Yes", onPress: this.handleLogout }
-      ],
-      { cancelable: true }
-    );
+  constructor(props) {
+    super(props);
+    this.state = {
+      showLogoutModal: false,
+      loading: false,
+    };
+  }
+
+  openLogoutModal = () => {
+    this.setState({ showLogoutModal: true });
+  };
+
+  closeLogoutModal = () => {
+    this.setState({ showLogoutModal: false });
   };
 
   handleLogout = async () => {
+    this.setState({ loading: true, showLogoutModal: false });
+
     try {
       await AsyncStorage.clear();
-
-      // ✅ Update parent state too
       this.props.setIsLoggedIn(false);
 
       this.props.rootNavigation.dispatch(
@@ -38,13 +43,21 @@ export default class HeaderComponent extends Component {
         })
       );
 
+      // ✅ Toast message
+      if (this.props.toastRef && this.props.toastRef.current) {
+        this.props.toastRef.current.show("Logged out successfully", 2000);
+      }
+
     } catch (error) {
       console.log("Error clearing app data.", error);
+    } finally {
+      this.setState({ loading: false });
     }
   };
 
   render() {
     const { title, showBack, onBackPress, showLogo, showLogout, navigation } = this.props;
+    const { showLogoutModal, loading } = this.state;
 
     return (
       <View style={styles.headerFixed}>
@@ -62,7 +75,14 @@ export default class HeaderComponent extends Component {
             <TouchableOpacity
               onPress={() => navigation.navigate('Home2')}
             >
-             <Image source={require('../assets/appIcon/rpkk.png')} style={{  width: widthPercentageToDP('25%'),   height: '100%', resizeMode: 'contain'}}/>
+              <Image
+                source={require('../assets/appIcon/rpkk.png')}
+                style={{
+                  width: widthPercentageToDP('25%'),
+                  height: '100%',
+                  resizeMode: 'contain',
+                }}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -73,13 +93,47 @@ export default class HeaderComponent extends Component {
           {showLogout && (
             <TouchableOpacity
               style={styles.logoutButton}
-              onPress={this.confirmLogout}
+              onPress={this.openLogoutModal}
             >
-              {/* <Text style={styles.logoutButtonText}>Logout</Text> */}
-              <Image source={require('../assets/icons/logout.png')} style={{aspectRatio:1/1,height:30,marginRight:widthPercentageToDP(-5)}}/>
+              <Image
+                source={require('../assets/icons/logout.png')}
+                style={{ aspectRatio: 1 / 1, height: 30, marginRight: widthPercentageToDP(-5) }}
+              />
             </TouchableOpacity>
           )}
         </View>
+
+        {/* ✅ Logout Confirm Modal */}
+        <Modal
+          transparent
+          animationType="fade"
+          visible={showLogoutModal}
+          onRequestClose={this.closeLogoutModal}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Logout</Text>
+              <Text style={styles.modalMessage}>Are you sure you want to logout?</Text>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelButton} onPress={this.closeLogoutModal}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.logoutConfirmButton} onPress={this.handleLogout}>
+                  <Text style={styles.logoutConfirmText}>Yes, Logout</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ✅ Fullscreen Center Loader */}
+        {loading && (
+          <View style={styles.loaderOverlay}>
+            <ActivityIndicator size="large" color="#7B5CFA" />
+          </View>
+        )}
       </View>
     );
   }
@@ -108,18 +162,6 @@ const styles = StyleSheet.create({
   backButton: {
     marginRight: 10,
   },
-  logoText: {
-    fontSize: 20,
-    flexDirection: "row",
-  },
-  logoTextBold: {
-    fontWeight: "bold",
-    color: "#000",
-  },
-  logoTextPurple: {
-    fontWeight: "bold",
-    color: "#7B5CFA",
-  },
   titleText: {
     fontSize: 16,
     fontWeight: "bold",
@@ -132,11 +174,70 @@ const styles = StyleSheet.create({
   logoutButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
-    // backgroundColor: "#FF4D4D",
     borderRadius: 20,
   },
-  logoutButtonText: {
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+  },
+  modalMessage: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
+    color: "#555",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#ccc",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    color: "#333",
+    fontWeight: "bold",
+  },
+  logoutConfirmButton: {
+    flex: 1,
+    backgroundColor: "#FF4D4D",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  logoutConfirmText: {
     color: "#fff",
     fontWeight: "bold",
   },
+loaderOverlay: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1000, // same or higher
+},
+
 });

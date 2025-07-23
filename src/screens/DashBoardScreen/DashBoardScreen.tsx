@@ -9,6 +9,7 @@ import {
   Linking,
   Dimensions,
   ScrollView,
+  ActivityIndicator, // ✅ Import loader
 } from 'react-native';
 import HeaderComponent from '../../components/HeaderComponent';
 import { apiGet } from '../../api/Api';
@@ -19,6 +20,7 @@ export default class Dashboard extends Component {
     super(props);
     this.state = {
       client: null,
+      loading: true, // ✅ Add loading state
     };
   }
 
@@ -38,6 +40,8 @@ export default class Dashboard extends Component {
       }
     } catch (error) {
       console.error('Error fetching client data:', error);
+    } finally {
+      this.setState({ loading: false }); // ✅ Stop loader when done
     }
   };
 
@@ -106,22 +110,22 @@ export default class Dashboard extends Component {
   );
 
   render() {
-    const { client } = this.state;
+    const { client, loading } = this.state;
 
     return (
-      <>
+      <View style={{ flex: 1 }}>
         <HeaderComponent
           navigation={this.props.navigation}
           showBack={false}
           showLogo={true}
           showLogout={true}
           onBackPress={() => this.props.navigation.goBack()}
-          setIsLoggedIn={this.props.setIsLoggedIn} />
+          setIsLoggedIn={this.props.setIsLoggedIn}
+        />
 
         <ScrollView style={styles.container}>
           <Text style={styles.welcome}>
-            🙏 Welcome {" "}
-            {client?.customer || 'Customer'}!
+            🙏 Welcome {client?.customer || 'Customer'}!
           </Text>
           <Text style={styles.subtitle}>
             Your OK CREDIT loan outstanding is ₹
@@ -175,13 +179,18 @@ export default class Dashboard extends Component {
                   paddingLeft={'15'}
                   absolute
                 />
-
-               
               </View>
             </>
           )}
         </ScrollView>
-      </>
+
+        {/* ✅ Full-Screen Loader WITHOUT background */}
+        {loading && (
+          <View style={styles.loaderOverlay}>
+            <ActivityIndicator size="large" color="#7B5CFA" />
+          </View>
+        )}
+      </View>
     );
   }
 }
@@ -252,34 +261,21 @@ const styles = StyleSheet.create({
   chartContainer: {
     marginTop: 20,
     alignItems: 'center',
-    marginBottom:10
+    marginBottom: 10,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  legendContainer: {
-    marginTop: 20,
-    width: '100%',
-  },
-  legendRow: {
-    flexDirection: 'row',
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginRight: 10,
-  },
-  legendText: {
-    flex: 1,
-    fontSize: 14,
-  },
-  legendAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    pointerEvents: 'auto',
   },
 });
