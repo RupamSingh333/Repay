@@ -9,7 +9,7 @@ import {
   Linking,
   Dimensions,
   ScrollView,
-  ActivityIndicator, // ✅ Import loader
+  ActivityIndicator,
 } from 'react-native';
 import HeaderComponent from '../../components/HeaderComponent';
 import { apiGet } from '../../api/Api';
@@ -20,7 +20,7 @@ export default class Dashboard extends Component {
     super(props);
     this.state = {
       client: null,
-      loading: true, // ✅ Add loading state
+      loading: true,
     };
   }
 
@@ -41,7 +41,7 @@ export default class Dashboard extends Component {
     } catch (error) {
       console.error('Error fetching client data:', error);
     } finally {
-      this.setState({ loading: false }); // ✅ Stop loader when done
+      this.setState({ loading: false });
     }
   };
 
@@ -75,14 +75,13 @@ export default class Dashboard extends Component {
         title: 'Minimum Payment Amount',
         amount: this.parseDecimal(client.minimum_part_payment),
         reward: this.parseDecimal(client.minimum_part_payment_reward),
-        color: '#F7C59F',
+        color: '#5A554C',
         payment_url: client.payment_url,
       },
     ];
   };
 
   handlePayment = (url) => {
-    console.log('Payment URL:', url);
     if (url) {
       Linking.openURL(url).catch((err) =>
         console.error('Failed to open URL:', err)
@@ -94,18 +93,13 @@ export default class Dashboard extends Component {
     <View style={[styles.card, { backgroundColor: item.color }]}>
       <Text style={styles.cardTitle}>{item.title}</Text>
       <View style={styles.amountRow}>
-        <Text style={styles.amount}>₹ {item.amount}</Text>
+        <Text style={styles.amount}>₹ {item.amount.toFixed(2)}</Text>
         <Image
           source={require('../../assets/icons/wallet.png')}
           style={styles.walletIcon}
         />
       </View>
-      <Text style={styles.reward}>₹ {item.reward} reward</Text>
-      <TouchableOpacity
-        style={styles.payButton}
-        onPress={() => this.handlePayment(item.payment_url)}>
-        <Text style={styles.payButtonText}>Proceed to Payment</Text>
-      </TouchableOpacity>
+      <Text style={styles.reward}>₹ {item.reward.toFixed(2)} reward</Text>
     </View>
   );
 
@@ -142,9 +136,17 @@ export default class Dashboard extends Component {
                 contentContainerStyle={{ paddingBottom: 20 }}
               />
 
+              {/* ✅ 4th Status Box */}
+              <View style={styles.statusCard}>
+                <Text style={styles.statusLabel}>Payment Status</Text>
+                <Text style={styles.statusValue}>
+                  {client?.payment_status || 'Completed'}
+                </Text>
+                <Text style={styles.statusSub}>Paid (Part payment)</Text>
+              </View>
+
               <View style={styles.chartContainer}>
                 <Text style={styles.chartTitle}>Payment Breakdown</Text>
-
                 <PieChart
                   data={[
                     {
@@ -163,8 +165,9 @@ export default class Dashboard extends Component {
                     },
                     {
                       name: 'Min Payment',
-                      amount: this.parseDecimal(client?.minimum_part_payment) || 0,
-                      color: '#F7C59F',
+                      amount:
+                        this.parseDecimal(client?.minimum_part_payment) || 0,
+                      color: '#5A554C',
                       legendFontColor: '#000',
                       legendFontSize: 12,
                     },
@@ -184,7 +187,6 @@ export default class Dashboard extends Component {
           )}
         </ScrollView>
 
-        {/* ✅ Full-Screen Loader WITHOUT background */}
         {loading && (
           <View style={styles.loaderOverlay}>
             <ActivityIndicator size="large" color="#7B5CFA" />
@@ -243,20 +245,28 @@ const styles = StyleSheet.create({
   reward: {
     color: '#fff',
     fontSize: 14,
-    marginBottom: 40,
   },
-  payButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 50,
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
+  statusCard: {
+    borderRadius: 16,
+    backgroundColor: '#DFFFE1',
+    padding: 20,
+    marginBottom: 20,
   },
-  payButtonText: {
+  statusLabel: {
     color: '#111',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  statusValue: {
+    color: '#0E8F43',
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statusSub: {
+    color: '#444',
+    fontSize: 14,
   },
   chartContainer: {
     marginTop: 20,
@@ -274,8 +284,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    pointerEvents: 'auto',
+    zIndex: 999,
   },
 });

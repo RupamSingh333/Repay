@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { View, Text, StyleSheet, Animated, Easing, Image } from "react-native";
+import { View, Text, StyleSheet, Animated, Easing, Image, StatusBar } from "react-native";
 
 export default class SplashScreen extends Component {
   constructor(props) {
@@ -12,24 +12,24 @@ export default class SplashScreen extends Component {
   componentDidMount() {
     this.startAnimation();
 
-    // 5 second baad HomeScreen pr navigate karega
+    // 2 second baad navigate karega
     setTimeout(() => {
       this.props.navigation.navigate("BottomTab");
-    }, 1000);
+    }, 2000);
   }
 
   startAnimation() {
     Animated.loop(
       Animated.sequence([
         Animated.timing(this.state.scaleValue, {
-          toValue: 1.2,
-          duration: 1000,
+          toValue: 1.15,
+          duration: 800,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(this.state.scaleValue, {
           toValue: 1,
-          duration: 1000,
+          duration: 800,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
@@ -40,14 +40,20 @@ export default class SplashScreen extends Component {
   render() {
     return (
       <View style={styles.container}>
-        <Animated.Image
-        source={require('../assets/appIcon/rpkk.png')}
-        style={[
-          styles.logoImage,
-          { transform: [{ scale: this.state.scaleValue }] },
-        ]}
-        resizeMode="contain"
-      />
+        <StatusBar barStyle="light-content" backgroundColor="#7B5CFA" />
+        <View style={styles.logoWrapper}>
+          <Animated.Image
+            source={require("../assets/appIcon/rpkk.png")}
+            style={[
+              styles.logoImage,
+              { transform: [{ scale: this.state.scaleValue }] },
+            ]}
+            resizeMode="contain"
+          />
+        </View>
+
+        <Text style={styles.appName}>RepayKaro</Text>
+        <Text style={styles.tagline}>Easy • Fast • Secure</Text>
       </View>
     );
   }
@@ -56,17 +62,35 @@ export default class SplashScreen extends Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff", // Optional: Splash bg color
+    backgroundColor: "#7B5CFA",
     justifyContent: "center",
     alignItems: "center",
   },
-  logoText: {
-    fontSize: 40,
+  logoWrapper: {
+    backgroundColor: "#fff",
+    borderRadius: 100,
+    padding: 30,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    marginBottom: 20,
+  },
+  logoImage: {
+    width: 120,
+    height: 120,
+  },
+  appName: {
+    fontSize: 26,
     fontWeight: "bold",
     color: "#fff",
+    letterSpacing: 1,
+    marginBottom: 5,
   },
-   logoImage: {
-    width: 150,   // set your desired width
-    height: 150,  // set your desired height
+  tagline: {
+    fontSize: 14,
+    color: "#eee",
+    letterSpacing: 1,
   },
 });
