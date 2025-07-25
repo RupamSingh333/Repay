@@ -17,38 +17,44 @@ export default class PaymentStatusScreen extends Component {
       timeline: [],
       loading: true,
       fadeAnim: new Animated.Value(0),
+      refreshing: false, // 👈 add this
     };
+
   }
 
   componentDidMount() {
     this.loadData();
   }
 
-  loadData = async () => {
-    this.setState({ loading: true, timeline: [] });
+  loadData = async (isRefreshing = false) => {
+    this.setState({ loading: !isRefreshing, refreshing: isRefreshing });
+
     try {
       const result = await apiGet("clients/get-timeline");
-      console.log("Timeline Data:", result);
 
       if (result && result.success && result.timeline?.length > 0) {
         this.setState(
-          { timeline: result.timeline, loading: false },
+          {
+            timeline: result.timeline,
+            loading: false,
+            refreshing: false,
+          },
           this.startAnimation
         );
       } else {
-        console.warn("No timeline data found");
-        this.setState({ loading: false });
+        this.setState({ loading: false, refreshing: false });
       }
     } catch (error) {
       console.error("Error fetching timeline:", error);
-      this.setState({ loading: false });
+      this.setState({ loading: false, refreshing: false });
     }
   };
+
 
   startAnimation = () => {
     Animated.timing(this.state.fadeAnim, {
       toValue: 1,
-      duration: 1000,
+      duration: 800,
       useNativeDriver: true,
     }).start();
   };
@@ -60,6 +66,25 @@ export default class PaymentStatusScreen extends Component {
 
   renderItem = ({ item, index }) => {
     const isLast = index === this.state.timeline.length - 1;
+    const delay = index * 100;
+
+    const scaleAnim = new Animated.Value(0.95);
+    const opacityAnim = new Animated.Value(0);
+
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 400,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 400,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     return (
       <View style={styles.itemContainer}>
@@ -67,7 +92,16 @@ export default class PaymentStatusScreen extends Component {
           <View style={styles.circle} />
           {!isLast && <View style={styles.line} />}
         </View>
-        <Animated.View style={[styles.content, { opacity: this.state.fadeAnim }]}>
+
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              transform: [{ scale: scaleAnim }],
+              opacity: opacityAnim,
+            },
+          ]}
+        >
           <Text style={styles.date}>{this.formatDate(item.createdAt)}</Text>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.subtitle}>{item.description}</Text>
@@ -100,7 +134,10 @@ export default class PaymentStatusScreen extends Component {
             ListEmptyComponent={
               <Text style={styles.emptyText}>No timeline data found.</Text>
             }
+            refreshing={this.state.refreshing}
+            onRefresh={() => this.loadData(true)} // 👈 call refresh
           />
+
         )}
       </View>
     );
@@ -110,7 +147,7 @@ export default class PaymentStatusScreen extends Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7FAFC",
+    backgroundColor: "#F3F4F6",
   },
   loaderContainer: {
     flex: 1,
@@ -119,54 +156,68 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+    paddingBottom: 30,
   },
   itemContainer: {
     flexDirection: "row",
-    marginBottom: 24,
     alignItems: "flex-start",
+    marginBottom: 28,
   },
   timeline: {
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 14,
   },
   circle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#2563EB",
-    zIndex: 1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#7B5CFA",
+    borderWidth: 2,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 3,
   },
   line: {
     width: 2,
     flex: 1,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#CBD5E1",
     marginTop: 2,
   },
   content: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    padding: 12,
-    borderRadius: 8,
-    elevation: 2,
+    padding: 14,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 6,
+    elevation: 3,
   },
   date: {
     fontSize: 12,
     color: "#6B7280",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   title: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
+    color: "#1F2937",
+    marginBottom: 2,
   },
   subtitle: {
     fontSize: 14,
-    color: "#374151",
+    color: "#4B5563",
     marginTop: 2,
+    lineHeight: 20,
   },
   emptyText: {
     textAlign: "center",
-    marginTop: 50,
-    color: "#999",
+    marginTop: 100,
+    color: "#9CA3AF",
+    fontSize: 16,
   },
 });

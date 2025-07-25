@@ -1,15 +1,23 @@
 import React, { Component } from 'react';
 import {
-  Text,
   View,
+  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  StatusBar,
+  Animated,
+  Easing,
+  Image,
+  Dimensions,
 } from 'react-native';
+
 import { apiPost } from '../../api/Api';
+
+const { height } = Dimensions.get('window');
 
 export default class LoginScreen extends Component {
   constructor(props) {
@@ -17,14 +25,38 @@ export default class LoginScreen extends Component {
     this.state = {
       mobileNumber: '',
       loading: false,
+      scaleValue: new Animated.Value(1),
     };
   }
+
+  componentDidMount() {
+    this.animateLogo();
+  }
+
+  animateLogo = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(this.state.scaleValue, {
+          toValue: 1.08,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(this.state.scaleValue, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
 
   handleSendOTP = async () => {
     const { mobileNumber } = this.state;
 
-    if (mobileNumber.length !== 10) {
-      this.props.toastRef.current.show('Please enter a valid 10-digit mobile number', 2000);
+    if (!/^\d{10}$/.test(mobileNumber)) {
+      this.props.toastRef.current.show('Enter a valid 10-digit mobile number', 2000);
       return;
     }
 
@@ -32,7 +64,6 @@ export default class LoginScreen extends Component {
 
     try {
       const json = await apiPost('clientAuth/login', { phone: mobileNumber });
-      console.log('API Response:', json);
 
       if (json.success) {
         this.props.toastRef.current.show('OTP sent successfully!', 2000);
@@ -48,60 +79,62 @@ export default class LoginScreen extends Component {
     }
   };
 
-  handleNavigate = () => {
-    this.props.navigation.navigate('Home');
-  };
-
   render() {
-    const { loading } = this.state;
+    const { mobileNumber, loading, scaleValue } = this.state;
+    const isValid = /^\d{10}$/.test(mobileNumber);
 
     return (
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#F9F9F9' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : null}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.safeArea}
       >
+        <StatusBar barStyle="light-content" backgroundColor="#8b5cf6" />
         <View style={styles.container}>
-          {/* Back button */}
-          <TouchableOpacity style={styles.backBtn} onPress={this.handleNavigate}>
-            <Text style={styles.backText}>{'< Back to dashboard'}</Text>
-          </TouchableOpacity>
+          {/* Logo + App Name */}
+          <View style={styles.topSection}>
+            <Animated.Image
+              source={require('../../assets/appIcon/rpkk.png')}
+              style={[styles.logo, { transform: [{ scale: scaleValue }] }]}
+              resizeMode="contain"
+            />
+            <Text style={styles.appName}>RepayKaro</Text>
+            <Text style={styles.tagline}>Manage Your Finances with Ease!</Text>
+          </View>
 
-          <View style={styles.centerContent}>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>
+          {/* Form Section */}
+          <View style={styles.formCard}>
+            <Text style={styles.welcome}>Welcome Back 👋</Text>
+            <Text style={styles.instruction}>
               Enter your mobile number to receive OTP
             </Text>
 
-            <View style={styles.formSection}>
-              <Text style={styles.label}>
-                Mobile Number <Text style={{ color: 'red' }}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your mobile number"
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={this.state.mobileNumber}
-                onChangeText={(text) => this.setState({ mobileNumber: text })}
-              />
+            <Text style={styles.formLabel}>
+              Mobile Number <Text style={{ color: 'red' }}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your mobile number"
+              placeholderTextColor="#aaa"
+              keyboardType="number-pad"
+              maxLength={10}
+              value={mobileNumber}
+              onChangeText={(text) =>
+                this.setState({ mobileNumber: text.replace(/[^0-9]/g, '') })
+              }
+            />
 
-              <TouchableOpacity
-                style={styles.button}
-                onPress={this.handleSendOTP}
-                activeOpacity={0.8}
-                disabled={loading}
-              >
+            <TouchableOpacity
+              style={[styles.button, (!isValid || loading) && { opacity: 0.5 }]}
+              onPress={this.handleSendOTP}
+              disabled={!isValid || loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
                 <Text style={styles.buttonText}>Send OTP</Text>
-              </TouchableOpacity>
-            </View>
+              )}
+            </TouchableOpacity>
           </View>
-
-          {/* ✅ Full-Screen Loader */}
-          {loading && (
-            <View style={styles.loaderOverlay}>
-              <ActivityIndicator size="large" color="#7B5CFA" />
-            </View>
-          )}
         </View>
       </KeyboardAvoidingView>
     );
@@ -109,72 +142,81 @@ export default class LoginScreen extends Component {
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#8b5cf6',
+  },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 50,
+    backgroundColor: '#8b5cf6',
+    justifyContent: 'flex-start',
   },
-  backBtn: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10,
+  topSection: {
+    alignItems: 'center',
+    marginTop: 70,
   },
-  backText: {
-    color: '#7B5CFA',
+  logo: {
+    width: 110,
+    height: 110,
+    backgroundColor: '#fff',
+    borderRadius: 60,
+    marginBottom: 10,
+  },
+  appName: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 10,
+  },
+  tagline: {
     fontSize: 14,
+    color: '#eee',
+    marginTop: 4,
+    marginBottom: 20,
   },
-  centerContent: {
+  formCard: {
+    backgroundColor: '#fff',
+    padding: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     flex: 1,
-    justifyContent: 'center',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
+  welcome: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#111',
-    marginBottom: 5,
+    marginBottom: 6,
   },
-  subtitle: {
-    fontSize: 14,
+  instruction: {
+    fontSize: 15,
     color: '#555',
-    marginBottom: 30,
+    marginBottom: 25,
   },
-  formSection: {
-    flex: 0,
-  },
-  label: {
+  formLabel: {
     fontSize: 14,
-    color: '#111',
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 15,
     paddingVertical: 14,
     fontSize: 16,
-    marginBottom: 25,
+    color: '#111',
+    marginBottom: 24,
   },
   button: {
-    backgroundColor: '#7B5CFA',
+    backgroundColor: '#8b5cf6',
     paddingVertical: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
     fontSize: 16,
-  },
-  loaderOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

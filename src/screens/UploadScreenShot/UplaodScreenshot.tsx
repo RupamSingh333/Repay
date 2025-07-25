@@ -8,11 +8,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Dimensions,
 } from "react-native";
 import { launchImageLibrary } from "react-native-image-picker";
 import HeaderComponent from "../../components/HeaderComponent";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { heightPercentageToDP } from "react-native-responsive-screen";
 
 export default class UploadPaymentScreenshot extends Component {
   constructor(props) {
@@ -23,39 +23,59 @@ export default class UploadPaymentScreenshot extends Component {
       loading: false,
       showDeleteModal: false,
       deleteId: null,
+      client: null,
+      fullScreenImage: null, // for full screen image preview
     };
   }
 
   componentDidMount() {
+    this.fetchClientData();
     this.fetchUploadedScreenshots();
   }
 
-  pickImage = () => {
-    const options = {
-      mediaType: "photo",
-      quality: 0.8,
-    };
-    launchImageLibrary(options, (response) => {
-      if (response.didCancel) {
-        console.log("User cancelled image picker");
-      } else if (response.errorCode) {
-        console.log("ImagePicker Error: ", response.errorMessage);
-      } else {
-        const uri = response.assets[0].uri;
-        this.setState({ selectedImage: uri });
+  fetchClientData = async () => {
+    const token = await AsyncStorage.getItem("liveCustomerToken");
+    if (!token) return;
+
+    try {
+      const res = await fetch("https://api.repaykaro.com/api/v1/clients/get-client", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const result = await res.json();
+      if (result?.success && result?.client) {
+        this.setState({ client: result.client });
       }
+    } catch (error) {
+      console.log("Error fetching client data:", error);
+    }
+  };
+
+  pickImage = () => {
+    const { client } = this.state;
+    if (client?.isPaid) return;
+
+    const options = { mediaType: "photo", quality: 0.8 };
+    launchImageLibrary(options, (response) => {
+      if (response.didCancel || response.errorCode) return;
+      const uri = response.assets?.[0]?.uri;
+      if (uri) this.setState({ selectedImage: uri });
     });
   };
 
   uploadScreenshot = async () => {
-    if (!this.state.selectedImage) {
-      this.props.toastRef.current.show("Please select an image first.", 2000);
+    const { selectedImage, client } = this.state;
+
+    if (client?.isPaid) return;
+    if (!selectedImage) {
+      this.props.toastRef.current?.show("Please select an image first.", 2500);
       return;
     }
 
     const token = await AsyncStorage.getItem("liveCustomerToken");
     if (!token) {
-      this.props.toastRef.current.show("Auth token not found", 2000);
+      this.props.toastRef.current?.show("Auth token not found", 2500);
       return;
     }
 
@@ -63,36 +83,32 @@ export default class UploadPaymentScreenshot extends Component {
 
     const formData = new FormData();
     formData.append("screenshot", {
-      uri: this.state.selectedImage,
+      uri: selectedImage,
       type: "image/jpeg",
       name: "screenshot.jpg",
     });
 
     try {
-      const response = await fetch(
-        "https://api.repaykaro.com/api/v1/clients/upload-payment-screenshot",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
+      const res = await fetch("https://api.repaykaro.com/api/v1/clients/upload-payment-screenshot", {
+        method: "POST",
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-      const result = await response.json();
-
+      const result = await res.json();
       if (result.success) {
-        this.props.toastRef.current.show("Screenshot uploaded successfully!", 2000);
+        this.props.toastRef.current?.show("Uploaded successfully!", 2000);
         this.setState({ selectedImage: null });
         this.fetchUploadedScreenshots();
       } else {
-        this.props.toastRef.current.show("Upload failed. Please try again.", 2000);
+        this.props.toastRef.current?.show("Upload failed. Try again.", 2500);
       }
     } catch (error) {
-      console.error("Upload Error:", error);
-      this.props.toastRef.current.show("Something went wrong!", 2000);
+      console.log("Upload error:", error);
+      this.props.toastRef.current?.show("Something went wrong!", 2500);
     } finally {
       this.setState({ loading: false });
     }
@@ -100,54 +116,37 @@ export default class UploadPaymentScreenshot extends Component {
 
   fetchUploadedScreenshots = async () => {
     const token = await AsyncStorage.getItem("liveCustomerToken");
-    if (!token) {
-      this.props.toastRef.current.show("Auth token not found", 2000);
-      return;
-    }
+    if (!token) return;
 
     try {
-      const response = await fetch(
-        "https://api.repaykaro.com/api/v1/clients/get-screenshot",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const result = await response.json();
-      if (result?.screen_shot?.length > 0) {
-        this.setState({ screenshots: result.screen_shot });
-      } else {
-        this.setState({ screenshots: [] });
-      }
+      const res = await fetch("https://api.repaykaro.com/api/v1/clients/get-screenshot", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const result = await res.json();
+      this.setState({ screenshots: result?.screen_shot || [] });
     } catch (error) {
-      console.error("Fetch Screenshot Error:", error);
-      this.props.toastRef.current.show("Error fetching uploaded screenshots.", 2000);
+      console.log("Fetch Screenshot Error:", error);
     }
   };
 
   openDeleteModal = (_id) => {
+    if (this.state.client?.isPaid) return;
     this.setState({ showDeleteModal: true, deleteId: _id });
   };
 
-  closeDeleteModal = () => {
-    this.setState({ showDeleteModal: false, deleteId: null });
-  };
+  closeDeleteModal = () => this.setState({ showDeleteModal: false, deleteId: null });
 
   confirmDelete = async () => {
     const { deleteId } = this.state;
     const token = await AsyncStorage.getItem("liveCustomerToken");
-    if (!token) {
-      this.props.toastRef.current.show("Auth token not found", 2000);
-      return;
-    }
+    if (!token || !deleteId) return;
 
     this.setState({ showDeleteModal: false, loading: true });
 
     try {
-      const response = await fetch(
+      const res = await fetch(
         `https://api.repaykaro.com/api/v1/clients/delete-screenshot/${deleteId}`,
         {
           method: "DELETE",
@@ -156,58 +155,69 @@ export default class UploadPaymentScreenshot extends Component {
           },
         }
       );
-
-      const result = await response.json();
-
+      const result = await res.json();
       if (result.success) {
-        this.props.toastRef.current.show("Screenshot deleted successfully!", 2000);
+        this.props.toastRef.current?.show("Screenshot deleted", 2000);
         this.fetchUploadedScreenshots();
-      } else {
-        this.props.toastRef.current.show("Failed to delete. Please try again.", 2000);
       }
     } catch (error) {
-      console.error("Delete Screenshot Error:", error);
-      this.props.toastRef.current.show("Something went wrong while deleting.", 2000);
+      console.log("Delete error:", error);
     } finally {
-      this.setState({ loading: false, deleteId: null });
+      this.setState({ loading: false });
     }
   };
 
+  openFullScreenImage = (uri) => {
+    this.setState({ fullScreenImage: uri });
+  };
+
+  closeFullScreenImage = () => {
+    this.setState({ fullScreenImage: null });
+  };
+
   render() {
-    const { selectedImage, screenshots, loading, showDeleteModal } = this.state;
+    const { selectedImage, screenshots, loading, showDeleteModal, client, fullScreenImage } = this.state;
+
+    const isPaid = client?.isPaid;
 
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: "#F9F9F9" }}>
         <HeaderComponent
           title="Upload Screenshot"
           showBack={true}
           onBackPress={() => this.props.navigation.goBack()}
         />
+
         <ScrollView contentContainerStyle={styles.container}>
           <View style={styles.uploadContainer}>
-            <TouchableOpacity style={styles.dropBox} onPress={this.pickImage}>
+            <TouchableOpacity
+              style={styles.dropBox}
+              onPress={this.pickImage}
+              disabled={isPaid}
+            >
               {selectedImage ? (
                 <Image source={{ uri: selectedImage }} style={styles.previewImage} />
               ) : (
                 <>
-                  <Text style={styles.selectText}>Select a file</Text>
-                  <Text style={styles.orText}>or pick from gallery</Text>
-                  <Text style={styles.limitText}>PNG, JPG, GIF up to 10MB</Text>
+                  <Text style={[styles.selectText, isPaid && { opacity: 0.4 }]}>📷 Select or Upload</Text>
+                  <Text style={[styles.orText, isPaid && { opacity: 0.4 }]}>From Gallery</Text>
                 </>
               )}
             </TouchableOpacity>
 
             <View style={styles.buttonRow}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={[styles.cancelButton, isPaid && { backgroundColor: "#E0E0E0" }]}
                 onPress={() => this.setState({ selectedImage: null })}
+                disabled={isPaid}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.uploadButton}
+                style={[styles.uploadButton, isPaid && { backgroundColor: "#C0C0C0" }]}
                 onPress={this.uploadScreenshot}
+                disabled={isPaid}
               >
                 <Text style={styles.uploadText}>Upload</Text>
               </TouchableOpacity>
@@ -217,53 +227,62 @@ export default class UploadPaymentScreenshot extends Component {
           <View style={styles.uploadedContainer}>
             <Text style={styles.uploadedTitle}>Uploaded Screenshots</Text>
             {screenshots.length === 0 ? (
-              <Text style={styles.noScreenshots}>No screenshots uploaded yet</Text>
+              <Text style={styles.noScreenshots}>No screenshots yet</Text>
             ) : (
               <View style={styles.gridContainer}>
                 {screenshots.map((item) => (
-                  <View key={item._id} style={styles.imageWrapper}>
-                    <Image
-                      source={{ uri: item.screen_shot }}
-                      style={styles.uploadedImage}
-                    />
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => this.openDeleteModal(item._id)}
-                    >
-                      <Image
-                        source={require("../../assets/icons/delete.png")}
-                        style={{
-                          aspectRatio: 1 / 1,
-                          height: heightPercentageToDP(2),
-                          tintColor: "#fff",
-                        }}
-                      />
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity
+                    key={item._id}
+                    onPress={() => this.openFullScreenImage(item.screen_shot)}
+                    style={styles.imageWrapper}
+                    activeOpacity={0.8}
+                  >
+                    <Image source={{ uri: item.screen_shot }} style={styles.uploadedImage} />
+                    {!isPaid && (
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => this.openDeleteModal(item._id)}
+                      >
+                        <Text style={styles.deleteX}>×</Text>
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
           </View>
         </ScrollView>
 
+        {/* Fullscreen Image Modal */}
+        <Modal visible={!!fullScreenImage} transparent animationType="fade">
+          <View style={styles.fullscreenBackdrop}>
+            <TouchableOpacity
+              style={styles.fullscreenCloseIcon}
+              onPress={this.closeFullScreenImage}
+            >
+              <Text style={styles.fullscreenCloseText}>×</Text>
+            </TouchableOpacity>
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+
+
+
+        {/* Delete Confirmation Modal */}
         <Modal transparent visible={showDeleteModal} animationType="fade">
           <View style={styles.modalBackdrop}>
             <View style={styles.modalBox}>
               <Text style={styles.modalTitle}>Delete Screenshot</Text>
-              <Text style={styles.modalMessage}>
-                Are you sure you want to delete this screenshot?
-              </Text>
+              <Text style={styles.modalMessage}>Are you sure you want to delete this?</Text>
               <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.modalCancel}
-                  onPress={this.closeDeleteModal}
-                >
+                <TouchableOpacity style={styles.modalCancel} onPress={this.closeDeleteModal}>
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalDelete}
-                  onPress={this.confirmDelete}
-                >
+                <TouchableOpacity style={styles.modalDelete} onPress={this.confirmDelete}>
                   <Text style={styles.modalDeleteText}>Yes, Delete</Text>
                 </TouchableOpacity>
               </View>
@@ -273,7 +292,7 @@ export default class UploadPaymentScreenshot extends Component {
 
         {loading && (
           <View style={styles.loaderOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
+            <ActivityIndicator size="large" color="#7B5CFA" />
           </View>
         )}
       </View>
@@ -281,73 +300,100 @@ export default class UploadPaymentScreenshot extends Component {
   }
 }
 
+
 const styles = StyleSheet.create({
-  // 🧩 Same styles as before
   container: {
     padding: 20,
-    alignItems: "center",
-    justifyContent: "flex-start",
   },
-  uploadContainer: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 20,
+  fullscreenBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
     alignItems: "center",
+    position: "relative",
+  },
+  fullscreenImage: {
     width: "100%",
-    maxWidth: 400,
+    height: "100%",
+  },
+  fullscreenCloseIcon: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: "#00000080",
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullscreenCloseText: {
+    color: "#fff",
+    fontSize: 26,
+    fontWeight: "bold",
+    lineHeight: 30,
+  },
+
+
+  uploadContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
   dropBox: {
     borderWidth: 2,
-    borderColor: "#ccc",
+    borderColor: "#C8C8C8",
     borderStyle: "dashed",
-    borderRadius: 8,
-    width: "100%",
+    borderRadius: 10,
     height: 150,
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
+    marginBottom: 15,
+    backgroundColor: "#FAFAFA",
   },
   selectText: {
-    color: "#7B5CFA",
-    fontWeight: "bold",
     fontSize: 16,
+    fontWeight: "600",
+    color: "#7B5CFA",
   },
   orText: {
-    marginTop: 5,
-    color: "#999",
-  },
-  limitText: {
-    marginTop: 5,
-    color: "#999",
-    fontSize: 12,
+    fontSize: 13,
+    color: "#888",
   },
   previewImage: {
     width: "100%",
     height: "100%",
+    borderRadius: 10,
     resizeMode: "cover",
   },
   buttonRow: {
     flexDirection: "row",
-    marginTop: 20,
-    width: "100%",
     justifyContent: "space-between",
   },
   cancelButton: {
-    backgroundColor: "#eee",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  uploadButton: {
-    backgroundColor: "#7B5CFA",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    flex: 1,
+    backgroundColor: "#F0F0F0",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    marginRight: 10,
   },
   cancelText: {
-    color: "#333",
+    color: "#555",
     fontWeight: "bold",
+  },
+  uploadButton: {
+    flex: 1,
+    backgroundColor: "#7B5CFA",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
   },
   uploadText: {
     color: "#fff",
@@ -355,52 +401,57 @@ const styles = StyleSheet.create({
   },
   uploadedContainer: {
     marginTop: 30,
-    width: "100%",
-    alignItems: "center",
   },
   uploadedTitle: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 10,
+    color: "#333",
   },
   noScreenshots: {
-    color: "#999",
+    color: "#888",
+    textAlign: "center",
+    marginTop: 10,
   },
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   imageWrapper: {
+    margin: 6,
     position: "relative",
-    margin: 5,
   },
   uploadedImage: {
     width: 100,
     height: 100,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   deleteButton: {
     position: "absolute",
-    top: 5,
-    right: 5,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    top: -6,
+    right: -6,
+    backgroundColor: "#FF4D4D",
     borderRadius: 12,
     width: 24,
     height: 24,
     alignItems: "center",
     justifyContent: "center",
   },
+  deleteX: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   loaderOverlay: {
     position: "absolute",
     top: 0,
-    left: 0,
-    right: 0,
     bottom: 0,
+    right: 0,
+    left: 0,
+    backgroundColor: "rgba(0,0,0,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-    zIndex: 9999,
   },
   modalBackdrop: {
     flex: 1,
@@ -413,34 +464,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     padding: 20,
-    alignItems: "center",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   modalMessage: {
-    fontSize: 14,
+    color: "#666",
     textAlign: "center",
     marginBottom: 20,
   },
   modalButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "100%",
   },
   modalCancel: {
     flex: 1,
     backgroundColor: "#ccc",
     padding: 12,
     borderRadius: 6,
-    marginRight: 10,
+    marginRight: 8,
     alignItems: "center",
   },
   modalDelete: {
     flex: 1,
-    backgroundColor: "#ff4444",
+    backgroundColor: "#FF4D4D",
     padding: 12,
     borderRadius: 6,
     alignItems: "center",
@@ -454,3 +503,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+

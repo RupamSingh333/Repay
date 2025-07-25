@@ -7,10 +7,13 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { heightPercentageToDP, widthPercentageToDP } from "react-native-responsive-screen";
-import { CommonActions } from '@react-navigation/native';
+import { heightPercentageToDP as hp, widthPercentageToDP as wp } from "react-native-responsive-screen";
+import { CommonActions } from "@react-navigation/native";
+
 
 export default class HeaderComponent extends Component {
   constructor(props) {
@@ -18,16 +21,35 @@ export default class HeaderComponent extends Component {
     this.state = {
       showLogoutModal: false,
       loading: false,
+      logoScale: new Animated.Value(1),
     };
   }
 
-  openLogoutModal = () => {
-    this.setState({ showLogoutModal: true });
+  componentDidMount() {
+    this.animateLogo();
+  }
+
+  animateLogo = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(this.state.logoScale, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        Animated.timing(this.state.logoScale, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.ease),
+        }),
+      ])
+    ).start();
   };
 
-  closeLogoutModal = () => {
-    this.setState({ showLogoutModal: false });
-  };
+  openLogoutModal = () => this.setState({ showLogoutModal: true });
+  closeLogoutModal = () => this.setState({ showLogoutModal: false });
 
   handleLogout = async () => {
     this.setState({ loading: true, showLogoutModal: false });
@@ -39,17 +61,15 @@ export default class HeaderComponent extends Component {
       this.props.rootNavigation.dispatch(
         CommonActions.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [{ name: "Home" }],
         })
       );
 
-      // ✅ Toast message
-      if (this.props.toastRef && this.props.toastRef.current) {
+      if (this.props.toastRef?.current) {
         this.props.toastRef.current.show("Logged out successfully", 2000);
       }
-
     } catch (error) {
-      console.log("Error clearing app data.", error);
+      console.log("Logout error:", error);
     } finally {
       this.setState({ loading: false });
     }
@@ -57,53 +77,51 @@ export default class HeaderComponent extends Component {
 
   render() {
     const { title, showBack, onBackPress, showLogo, showLogout, navigation } = this.props;
-    const { showLogoutModal, loading } = this.state;
+    const { showLogoutModal, loading, logoScale } = this.state;
 
     return (
-      <View style={styles.headerFixed}>
-        <View style={styles.leftContainer}>
+      <View style={styles.headerContainer}>
+        {/* Left: Back Button */}
+        <View style={styles.sideContainer}>
           {showBack && (
-            <TouchableOpacity onPress={onBackPress} style={styles.backButton}>
+            <TouchableOpacity onPress={onBackPress}>
               <Image
-                source={require('../assets/icons/back.png')}
-                style={{ aspectRatio: 1 / 1, height: heightPercentageToDP(3) }}
+                source={require("../assets/icons/back.png")}
+                style={styles.icon}
               />
             </TouchableOpacity>
           )}
+        </View>
 
+        {/* Center: Logo */}
+        <View style={styles.logoContainer}>
           {showLogo && (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Home2')}
-            >
-              <Image
-                source={require('../assets/appIcon/rpkk.png')}
-                style={{
-                  width: widthPercentageToDP('25%'),
-                  height: '100%',
-                  resizeMode: 'contain',
-                }}
+            <TouchableOpacity onPress={() => navigation.navigate("Home2")}>
+              <Animated.Image
+                source={require("../assets/appIcon/rpkk.png")}
+                style={[
+                  styles.logo,
+                  { transform: [{ scale: logoScale }] },
+                ]}
               />
             </TouchableOpacity>
           )}
+          {title && <Text style={styles.titleText}>{title}</Text>}
         </View>
 
-        <Text style={styles.titleText}>{title}</Text>
-
-        <View style={styles.rightContainer}>
+        {/* Right: Logout */}
+        <View style={styles.sideContainer}>
           {showLogout && (
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={this.openLogoutModal}
-            >
+            <TouchableOpacity onPress={this.openLogoutModal}>
               <Image
-                source={require('../assets/icons/logout.png')}
-                style={{ aspectRatio: 1 / 1, height: 30, marginRight: widthPercentageToDP(-5) }}
+                source={require("../assets/icons/logout.png")}
+                style={[styles.icon, { tintColor: "#FF4D4D" }]}
               />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* ✅ Logout Confirm Modal */}
+        {/* 🔐 Logout Modal */}
         <Modal
           transparent
           animationType="fade"
@@ -128,7 +146,7 @@ export default class HeaderComponent extends Component {
           </View>
         </Modal>
 
-        {/* ✅ Fullscreen Center Loader */}
+        {/* ⏳ Loading Overlay */}
         {loading && (
           <View style={styles.loaderOverlay}>
             <ActivityIndicator size="large" color="#7B5CFA" />
@@ -140,42 +158,51 @@ export default class HeaderComponent extends Component {
 }
 
 const styles = StyleSheet.create({
-  headerFixed: {
+  headerContainer: {
     width: "100%",
-    height: 60,
+    height: 65,
     backgroundColor: "#fff",
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    elevation: 4,
+    elevation: 6,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 2,
-    zIndex: 999,
+    shadowRadius: 4,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  leftContainer: {
-    flexDirection: "row",
+  sideContainer: {
+    width: wp("20%"),
+    justifyContent: "center",
     alignItems: "center",
   },
-  backButton: {
-    marginRight: 10,
+  logoContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "column",
+  },
+  logo: {
+    width: wp("30%"),
+    height: hp("8%"),
+    resizeMode: "contain",
+    marginBottom: 2,
   },
   titleText: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 14,
+    fontWeight: "600",
     color: "#333",
+    marginTop: 2,
   },
-  rightContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  icon: {
+    width: 26,
+    height: 26,
+    resizeMode: "contain",
   },
-  logoutButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-  },
+  // Modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
@@ -185,21 +212,22 @@ const styles = StyleSheet.create({
   modalBox: {
     width: "80%",
     backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
     alignItems: "center",
+    elevation: 6,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 10,
-    color: "#333",
+    marginBottom: 8,
+    color: "#222",
   },
   modalMessage: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: "center",
     marginBottom: 20,
-    color: "#555",
+    color: "#666",
   },
   modalButtons: {
     flexDirection: "row",
@@ -208,7 +236,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#ccc",
+    backgroundColor: "#E0E0E0",
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: "center",
@@ -229,15 +257,15 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
-loaderOverlay: {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 1000, // same or higher
-},
-
+  loaderOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    zIndex: 1000,
+  },
 });

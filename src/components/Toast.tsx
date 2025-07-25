@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 export default class Toast extends React.Component {
   constructor(props) {
@@ -9,29 +11,41 @@ export default class Toast extends React.Component {
       message: '',
       fadeAnim: new Animated.Value(0),
     };
+    this.timeout = null;
   }
 
-  show = (message = '', duration = 2000) => {
+  show = (message = '', duration = 2500) => {
+    if (this.timeout) clearTimeout(this.timeout);
+
     this.setState({ visible: true, message }, () => {
       Animated.timing(this.state.fadeAnim, {
         toValue: 1,
-        duration: 200,
+        duration: 300,
         useNativeDriver: true,
       }).start(() => {
-        setTimeout(this.hide, duration);
+        this.timeout = setTimeout(this.hide, duration);
       });
     });
   };
 
   hide = () => {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
+    }
+
     Animated.timing(this.state.fadeAnim, {
       toValue: 0,
-      duration: 200,
+      duration: 300,
       useNativeDriver: true,
     }).start(() => {
       this.setState({ visible: false, message: '' });
     });
   };
+
+  componentWillUnmount() {
+    if (this.timeout) clearTimeout(this.timeout);
+  }
 
   render() {
     if (!this.state.visible) return null;
@@ -47,18 +61,26 @@ export default class Toast extends React.Component {
 const styles = StyleSheet.create({
   toastContainer: {
     position: 'absolute',
-    bottom: 50,
-    left: 20,
-    right: 20,
-    backgroundColor: '#333',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    bottom: 70,
+    left: width * 0.1,
+    right: width * 0.1,
+    backgroundColor: '#1E1E2F',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 10,
   },
   toastText: {
-    color: '#fff',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

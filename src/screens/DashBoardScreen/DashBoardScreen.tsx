@@ -10,10 +10,16 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
+  Animated,
+  Easing,
+  RefreshControl,
+  Appearance,
 } from 'react-native';
 import HeaderComponent from '../../components/HeaderComponent';
 import { apiGet } from '../../api/Api';
 import { PieChart } from 'react-native-chart-kit';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default class Dashboard extends Component {
   constructor(props) {
@@ -21,65 +27,85 @@ export default class Dashboard extends Component {
     this.state = {
       client: null,
       loading: true,
+      refreshing: false,
+      fadeAnim: new Animated.Value(0),
+      slideAnim: new Animated.Value(30),
     };
   }
 
   componentDidMount() {
+    this.animateUI();
     this.fetchClientData();
   }
 
+  animateUI = () => {
+    Animated.parallel([
+      Animated.timing(this.state.fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(this.state.slideAnim, {
+        toValue: 0,
+        duration: 500,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   fetchClientData = async () => {
+    this.setState({ loading: true });
     try {
       const result = await apiGet('clients/get-client');
-      console.log('Client Data:', result);
-
-      if (result && result.success && result.client) {
+      if (result?.success && result?.client) {
         this.setState({ client: result.client });
-      } else {
-        console.warn('Client not found in API response');
       }
     } catch (error) {
       console.error('Error fetching client data:', error);
     } finally {
-      this.setState({ loading: false });
+      this.setState({ loading: false, refreshing: false });
     }
   };
 
-  parseDecimal = (value) => {
-    if (typeof value === 'object' && value.$numberDecimal) {
-      return parseFloat(value.$numberDecimal);
-    }
-    return parseFloat(value);
+  onRefresh = () => {
+    this.setState({ refreshing: true }, () => {
+      this.fetchClientData();
+    });
   };
 
-  makePaymentOptions = (client) => {
-    return [
-      {
-        id: '1',
-        title: 'Foreclosure Amount',
-        amount: this.parseDecimal(client.fore_closure),
-        reward: this.parseDecimal(client.foreclosure_reward),
-        color: '#5B6CFF',
-        payment_url: client.payment_url,
-      },
-      {
-        id: '2',
-        title: 'Settlement Amount',
-        amount: this.parseDecimal(client.settlement),
-        reward: this.parseDecimal(client.settlement_reward),
-        color: '#7D5BA6',
-        payment_url: client.payment_url,
-      },
-      {
-        id: '3',
-        title: 'Minimum Payment Amount',
-        amount: this.parseDecimal(client.minimum_part_payment),
-        reward: this.parseDecimal(client.minimum_part_payment_reward),
-        color: '#5A554C',
-        payment_url: client.payment_url,
-      },
-    ];
-  };
+  parseDecimal = (value) =>
+    typeof value === 'object' && value?.$numberDecimal
+      ? parseFloat(value.$numberDecimal)
+      : parseFloat(value || 0);
+
+  makePaymentOptions = (client) => [
+    {
+      id: '1',
+      title: 'Foreclosure Amount',
+      amount: this.parseDecimal(client.fore_closure),
+      reward: this.parseDecimal(client.foreclosure_reward),
+      color: '#5B6CFF',
+      payment_url: client.payment_url,
+    },
+    {
+      id: '2',
+      title: 'Settlement Amount',
+      amount: this.parseDecimal(client.settlement),
+      reward: this.parseDecimal(client.settlement_reward),
+      color: '#7D5BA6',
+      payment_url: client.payment_url,
+    },
+    {
+      id: '3',
+      title: 'Minimum Payment',
+      amount: this.parseDecimal(client.minimum_part_payment),
+      reward: this.parseDecimal(client.minimum_part_payment_reward),
+      color: '#5A554C',
+      payment_url: client.payment_url,
+    },
+  ];
 
   handlePayment = (url) => {
     if (url) {
@@ -90,24 +116,33 @@ export default class Dashboard extends Component {
   };
 
   renderItem = ({ item }) => (
-    <View style={[styles.card, { backgroundColor: item.color }]}>
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <View style={styles.amountRow}>
-        <Text style={styles.amount}>₹ {item.amount.toFixed(2)}</Text>
-        <Image
-          source={require('../../assets/icons/wallet.png')}
-          style={styles.walletIcon}
-        />
+    <TouchableOpacity
+      onPress={() => this.handlePayment(item.payment_url)}
+      activeOpacity={0.9}
+    >
+      <View style={[styles.card, { backgroundColor: item.color }]}>
+        <Text style={styles.cardTitle}>{item.title}</Text>
+        <View style={styles.amountRow}>
+          <Text style={styles.amount}>₹ {item.amount.toFixed(2)}</Text>
+          <Image
+            source={require('../../assets/icons/wallet.png')}
+            style={styles.walletIcon}
+          />
+        </View>
+        <Text style={styles.reward}>Reward ₹ {item.reward.toFixed(2)}</Text>
       </View>
-      <Text style={styles.reward}>₹ {item.reward.toFixed(2)} reward</Text>
-    </View>
+    </TouchableOpacity>
   );
 
   render() {
-    const { client, loading } = this.state;
+    const { client, loading, fadeAnim, slideAnim, refreshing } = this.state;
+    const isDark = Appearance.getColorScheme() === 'dark';
+    const textColor = isDark ? '#E5E7EB' : '#1F2937';
+    const subColor = isDark ? '#9CA3AF' : '#4B5563';
+    const bgColor = isDark ? '#111827' : '#F9F9FF';
 
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: bgColor }}>
         <HeaderComponent
           navigation={this.props.navigation}
           showBack={false}
@@ -117,13 +152,24 @@ export default class Dashboard extends Component {
           setIsLoggedIn={this.props.setIsLoggedIn}
         />
 
-        <ScrollView style={styles.container}>
-          <Text style={styles.welcome}>
-            🙏 Welcome {client?.customer || 'Customer'}!
+        <Animated.ScrollView
+          style={{
+            flex: 1,
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+            padding: 20,
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={this.onRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={[styles.welcome, { color: textColor }]}>
+            👋 Welcome {client?.customer || 'Customer'}
           </Text>
-          <Text style={styles.subtitle}>
-            Your OK CREDIT loan outstanding is ₹
-            {this.parseDecimal(client?.fore_closure) || '0.00'}
+          <Text style={[styles.subtitle, { color: subColor }]}>
+            Your OK Credit loan outstanding: ₹
+            {this.parseDecimal(client?.fore_closure).toFixed(2) || '0.00'}
           </Text>
 
           {client && (
@@ -136,56 +182,59 @@ export default class Dashboard extends Component {
                 contentContainerStyle={{ paddingBottom: 20 }}
               />
 
-              {/* ✅ 4th Status Box */}
-              <View style={styles.statusCard}>
-                <Text style={styles.statusLabel}>Payment Status</Text>
-                <Text style={styles.statusValue}>
+              <View style={[styles.statusCard, { backgroundColor: isDark ? '#1F2937' : '#EAFBF1' }]}>
+                <Text style={[styles.statusLabel, { color: textColor }]}>Payment Status</Text>
+                <Text style={[styles.statusValue, { color: '#0E8F43' }]}>
                   {client?.payment_status || 'Completed'}
                 </Text>
-                <Text style={styles.statusSub}>Paid (Part payment)</Text>
+                <Text style={[styles.statusSub, { color: subColor }]}>Paid (Part payment)</Text>
               </View>
 
               <View style={styles.chartContainer}>
-                <Text style={styles.chartTitle}>Payment Breakdown</Text>
+                <Text style={[styles.chartTitle, { color: textColor }]}>Payment Breakdown</Text>
                 <PieChart
                   data={[
                     {
                       name: 'Foreclosure',
-                      amount: this.parseDecimal(client?.fore_closure) || 0,
+                      amount: this.parseDecimal(client?.fore_closure),
                       color: '#5B6CFF',
-                      legendFontColor: '#000',
-                      legendFontSize: 12,
+                      legendFontColor: textColor,
+                      legendFontSize: 13,
                     },
                     {
                       name: 'Settlement',
-                      amount: this.parseDecimal(client?.settlement) || 0,
+                      amount: this.parseDecimal(client?.settlement),
                       color: '#7D5BA6',
-                      legendFontColor: '#000',
-                      legendFontSize: 12,
+                      legendFontColor: textColor,
+                      legendFontSize: 13,
                     },
                     {
                       name: 'Min Payment',
-                      amount:
-                        this.parseDecimal(client?.minimum_part_payment) || 0,
+                      amount: this.parseDecimal(client?.minimum_part_payment),
                       color: '#5A554C',
-                      legendFontColor: '#000',
-                      legendFontSize: 12,
+                      legendFontColor: textColor,
+                      legendFontSize: 13,
                     },
                   ]}
-                  width={Dimensions.get('window').width - 40}
+                  width={SCREEN_WIDTH - 40}
                   height={220}
                   chartConfig={{
-                    color: () => `rgba(0, 0, 0, 1)`,
+                    color: () => textColor,
+                    labelColor: () => textColor,
+                    backgroundColor: 'transparent',
+                    backgroundGradientFrom: bgColor,
+                    backgroundGradientTo: bgColor,
+                    decimalPlaces: 2,
                   }}
-                  accessor={'amount'}
-                  backgroundColor={'transparent'}
-                  paddingLeft={'15'}
+                  accessor="amount"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
                   absolute
                 />
               </View>
             </>
           )}
-        </ScrollView>
+        </Animated.ScrollView>
 
         {loading && (
           <View style={styles.loaderOverlay}>
@@ -198,44 +247,37 @@ export default class Dashboard extends Component {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#F9F9F9',
-  },
   welcome: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    marginTop: 2,
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    color: '#555',
     marginBottom: 20,
   },
   card: {
     borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
-    position: 'relative',
+    marginBottom: 16,
+    elevation: 3,
   },
   cardTitle: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   amountRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 5,
   },
   amount: {
-    color: '#fff',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
+    color: '#fff',
   },
   walletIcon: {
     width: 28,
@@ -244,34 +286,31 @@ const styles = StyleSheet.create({
   },
   reward: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
+    marginTop: 4,
   },
   statusCard: {
-    borderRadius: 16,
-    backgroundColor: '#DFFFE1',
-    padding: 20,
-    marginBottom: 20,
+    padding: 18,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   statusLabel: {
-    color: '#111',
     fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
+    marginBottom: 6,
+    fontWeight: '600',
   },
   statusValue: {
-    color: '#0E8F43',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   statusSub: {
-    color: '#444',
-    fontSize: 14,
+    fontSize: 13,
   },
   chartContainer: {
     marginTop: 20,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 30,
   },
   chartTitle: {
     fontSize: 18,
@@ -284,9 +323,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
   },
 });

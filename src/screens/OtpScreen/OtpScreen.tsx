@@ -65,27 +65,18 @@ export default class OTPScreen extends Component {
         otp: otp,
       });
 
-      console.log('OTP Verify Response:', json);
-
       if (json.success && json.jwtToken) {
         await AsyncStorage.setItem('liveCustomerToken', json.jwtToken);
-
         this.props.toastRef.current.show('OTP Verified! Redirecting...', 1500);
-
         this.props.onLoginSuccess();
       } else {
         this.props.toastRef.current.show(json.message || 'Invalid OTP!', 2000);
       }
     } catch (error) {
-      console.error(error);
       this.props.toastRef.current.show('Network error!', 2000);
     } finally {
       this.setState({ loading: false });
     }
-  };
-
-  handleBack = () => {
-    this.props.navigation.goBack();
   };
 
   handleChangeNumber = () => {
@@ -102,65 +93,42 @@ export default class OTPScreen extends Component {
         behavior={Platform.OS === 'ios' ? 'padding' : null}
       >
         <View style={styles.container}>
-          {/* Back Button */}
-          <TouchableOpacity style={styles.backBtn} onPress={this.handleBack}>
-            <Text style={styles.backText}>{'< Back to dashboard'}</Text>
+          <Text style={styles.heading}>OTP Verification</Text>
+          <Text style={styles.subheading}>Enter the OTP sent to {mobile}</Text>
+
+          <OTPInputView
+            style={{ width: '80%', height: 60, alignSelf: 'center', marginTop: 30 }}
+            pinCount={4}
+            autoFocusOnLoad
+            code={otp}
+            codeInputFieldStyle={styles.inputBox}
+            codeInputHighlightStyle={styles.inputBoxActive}
+            onCodeChanged={(code) => this.setState({ otp: code })}
+          />
+
+          {resendTimer > 0 ? (
+            <Text style={styles.resendText}>Resend OTP in {resendTimer}s</Text>
+          ) : (
+            <TouchableOpacity onPress={this.startResendTimer}>
+              <Text style={styles.resendLink}>Resend OTP</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity onPress={this.handleChangeNumber}>
+            <Text style={styles.changeNumber}>Change Mobile Number</Text>
           </TouchableOpacity>
 
-          {/* Center Content */}
-          <View style={styles.centerContent}>
-            <Text style={styles.title}>OTP Verification</Text>
-            <Text style={styles.subtitle}>
-              Enter the OTP sent to {mobile}
-            </Text>
-
-            <Text style={styles.label}>
-              Enter OTP <Text style={{ color: 'red' }}>*</Text>
-            </Text>
-
-            <OTPInputView
-              style={{ width: '80%', height: 60, alignSelf: 'center' }}
-              pinCount={4}
-              code={otp}
-              autoFocusOnLoad
-              codeInputFieldStyle={styles.underlineStyleBase}
-              codeInputHighlightStyle={styles.underlineStyleHighLighted}
-              onCodeChanged={(code) => {
-                this.setState({ otp: code });
-              }}
-              onCodeFilled={(code) => {
-                this.setState({ otp: code });
-              }}
-            />
-
-            {resendTimer > 0 ? (
-              <Text style={styles.resendText}>
-                Resend OTP ({resendTimer}s)
-              </Text>
+          <TouchableOpacity
+            style={[styles.button, loading && { opacity: 0.6 }]}
+            onPress={this.handleVerifyOTP}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
             ) : (
-              <TouchableOpacity onPress={this.startResendTimer}>
-                <Text style={styles.resendButton}>Resend OTP</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity onPress={this.handleChangeNumber}>
-              <Text style={styles.changeNumberText}>Change Mobile Number</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.button}
-              onPress={this.handleVerifyOTP}
-              disabled={loading}
-            >
               <Text style={styles.buttonText}>Verify OTP</Text>
-            </TouchableOpacity>
-          </View>
-
-          {loading && (
-            <View style={styles.loaderOverlay}>
-              <ActivityIndicator size="large" color="#7B5CFA" />
-            </View>
-          )}
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     );
@@ -170,95 +138,66 @@ export default class OTPScreen extends Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 50,
-  },
-  backBtn: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10,
-  },
-  backText: {
-    color: '#7B5CFA',
-    fontSize: 14,
-  },
-  centerContent: {
-    flex: 1,
+    padding: 24,
     justifyContent: 'center',
-    marginTop: 50,
+    backgroundColor: '#F9F9F9',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111',
-    marginBottom: 5,
+  heading: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#4B0082',
     textAlign: 'center',
+    marginBottom: 10,
   },
-  subtitle: {
+  subheading: {
     fontSize: 14,
     color: '#555',
-    marginBottom: 30,
     textAlign: 'center',
+    marginBottom: 20,
   },
-  label: {
-    fontSize: 14,
-    color: '#111',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  underlineStyleBase: {
-    width: 50,
-    height: 50,
+  inputBox: {
+    width: 55,
+    height: 55,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 10,
     fontSize: 20,
     color: '#111',
-    textAlign: 'center',
+    backgroundColor: '#fff',
   },
-  underlineStyleHighLighted: {
-    borderColor: '#7B5CFA',
+  inputBoxActive: {
+    borderColor: '#8b5cf6',
   },
   resendText: {
     marginTop: 20,
-    color: '#555',
     fontSize: 14,
     textAlign: 'center',
+    color: '#999',
   },
-  resendButton: {
+  resendLink: {
     marginTop: 20,
-    color: '#7B5CFA',
-    fontWeight: 'bold',
     fontSize: 14,
     textAlign: 'center',
+    color: '#8b5cf6',
+    fontWeight: '600',
   },
-  changeNumberText: {
+  changeNumber: {
     marginTop: 10,
-    color: '#7B5CFA',
-    textAlign: 'center',
     fontSize: 14,
+    textAlign: 'center',
+    color: '#8b5cf6',
+    fontWeight: '600',
   },
   button: {
-    backgroundColor: '#7B5CFA',
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
     marginTop: 30,
+    backgroundColor: '#8b5cf6',
+    paddingVertical: 16,
+    borderRadius: 10,
+    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
     fontSize: 16,
-  },
-  loaderOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

@@ -11,7 +11,6 @@ import {
   RefreshControl,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import ScratchView from "react-native-scratch";
 import ConfettiCannon from "react-native-confetti-cannon";
 import HeaderComponent from "../../components/HeaderComponent";
 
@@ -26,7 +25,7 @@ export default class ScratchCardList extends Component {
       loading: true,
       scrollEnabled: true,
       refreshing: false,
-      confettiVisible: false, // 🔑 Global confetti flag
+      confettiVisible: false,
     };
   }
 
@@ -73,7 +72,7 @@ export default class ScratchCardList extends Component {
   }
 
   handleReveal = (id) => {
-    console.log("Scratch revealed for ID:", id);
+    console.log("Revealed for ID:", id);
     this.setState(
       (prev) => ({
         coupons: prev.coupons.map((c) =>
@@ -82,7 +81,6 @@ export default class ScratchCardList extends Component {
         confettiVisible: true,
       }),
       () => {
-        // Confetti visible 2 sec, then hide + refresh
         setTimeout(() => {
           this.setState({ confettiVisible: false });
           this.getCoupons();
@@ -97,20 +95,12 @@ export default class ScratchCardList extends Component {
     });
   };
 
-  setScrollEnabled = (enabled) => {
-    this.setState({ scrollEnabled: enabled });
-  };
-
   renderItem = ({ item }) => (
     <View style={styles.card}>
       {item.scratched === 1 ? (
         <RevealedCard item={item} />
       ) : (
-        <ScratchCardItem
-          item={item}
-          onRevealed={() => this.handleReveal(item._id)}
-          setScrollEnabled={this.setScrollEnabled}
-        />
+        <LockedCard item={item} onUnlock={() => this.handleReveal(item._id)} />
       )}
     </View>
   );
@@ -128,7 +118,7 @@ export default class ScratchCardList extends Component {
         />
         <View style={styles.container}>
           {loading ? (
-            <ActivityIndicator size="large" color='#7B5CFA'/>
+            <ActivityIndicator size="large" color="#7B5CFA" />
           ) : (
             <FlatList
               data={coupons}
@@ -161,6 +151,7 @@ export default class ScratchCardList extends Component {
   }
 }
 
+// ✔️ Card shown when coupon is already revealed
 const RevealedCard = ({ item }) => (
   <View style={styles.revealContent}>
     <Text style={styles.amount}>₹{item.amount?.$numberDecimal || "0.00"}</Text>
@@ -178,40 +169,17 @@ const RevealedCard = ({ item }) => (
   </View>
 );
 
-class ScratchCardItem extends Component {
-  handleReveal = () => {
-    console.log("Scratch done!");
-    this.props.onRevealed();
-  };
-
-  render() {
-    const { item, setScrollEnabled } = this.props;
-
-    return (
-      <View style={{ flex: 1, height: 200 }}>
-        <ScratchView
-          style={{ flex: 1 }}
-          brushSize={50}
-          threshold={30}
-          fadeOut
-          placeholderColor="#2C3345"
-          onRevealScratch={this.handleReveal}
-          renderPlaceholder={() => (
-            <View style={styles.placeholder}>
-              <View style={styles.circle}>
-                <Text style={styles.cross}>×</Text>
-              </View>
-              <Text style={styles.placeholderText}>Scratch here to reveal</Text>
-            </View>
-          )}
-          renderContent={() => <RevealedCard item={item} />}
-          onTouchStart={() => setScrollEnabled(false)}
-          onTouchEnd={() => setScrollEnabled(true)}
-        />
-      </View>
-    );
-  }
-}
+// 🔒 Static "locked" card after scratch feature removed
+const LockedCard = ({ item, onUnlock }) => (
+  <TouchableOpacity style={styles.revealContent} onPress={onUnlock}>
+    <Text style={{ fontSize: 18, color: "#666", marginBottom: 10 }}>
+      Tap to Reveal
+    </Text>
+    <Text style={{ fontSize: 12, color: "#aaa", textAlign: "center" }}>
+      (Scratch feature disabled)
+    </Text>
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -227,31 +195,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 20,
     elevation: 4,
-  },
-  placeholder: {
-    flex: 1,
-    backgroundColor: "#2C3345",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  circle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: "#ccc",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  cross: {
-    fontSize: 30,
-    color: "#ccc",
-    fontWeight: "bold",
-  },
-  placeholderText: {
-    color: "#ddd",
-    fontSize: 14,
   },
   revealContent: {
     flex: 1,
